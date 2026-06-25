@@ -72,3 +72,7 @@ node tests/cp016-chat-interno-orden.js
 | CP-015 | Cambio de sucursal desde el selector | ✅ |
 | CP-016 | Chat interno de una orden | ⚠️ |
 | CP-026 | Descargar PDF de una orden desde el menú de tres puntos (Recepción) | ✅ |
+| CP-027 | Ver orden online desde Opciones avanzadas del menú de tres puntos | ✅ |
+| CP-028 | Ver bitácora de una orden desde Opciones avanzadas | ✅ |
+| CP-029 | Desactivar una orden de prueba desde Opciones avanzadas | ✅ |
+| CP-030 | Eliminar una orden de prueba desde Opciones avanzadas | ✅ |

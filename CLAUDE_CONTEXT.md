@@ -187,6 +187,10 @@ La suite en el repositorio actualmente contiene scripts para CP-001 a CP-025. El
 | CP-024 | tests/cp024-detalle-orden-muestra-informacion.js | Valida apertura del detalle de una orden. |
 | CP-025 | tests/cp025-agregar-abono-orden.js | Prueba la interacción para registrar un abono. |
 | CP-026 | tests/cp026-descargar-pdf-orden.js | Verifica la descarga del PDF de una orden desde el menú de tres puntos en Recepción de Vehículo. |
+| CP-027 | tests/cp027-ver-orden-online.js | Verifica que "Ver orden online" (Opciones avanzadas) abra la vista pública de la orden. |
+| CP-028 | tests/cp028-ver-bitacora-orden.js | Verifica que "Ver bitácora" (Opciones avanzadas) cargue la bitácora de la orden. |
+| CP-029 | tests/cp029-desactivar-orden.js | Verifica que "Desactivar orden" (Opciones avanzadas) cambie el estado de una orden de prueba a inactiva. |
+| CP-030 | tests/cp030-eliminar-orden.js | Verifica que "Eliminar orden" (Opciones avanzadas) elimine permanentemente una orden de prueba del listado. |
 
 ---
 
