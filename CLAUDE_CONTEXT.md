@@ -186,7 +186,7 @@ La suite en el repositorio actualmente contiene scripts para CP-001 a CP-025. El
 | CP-023 | tests/cp023-descarga-reporte-excel.js | Verifica intento de descarga del reporte en Excel. |
 | CP-024 | tests/cp024-detalle-orden-muestra-informacion.js | Valida apertura del detalle de una orden. |
 | CP-025 | tests/cp025-agregar-abono-orden.js | Prueba la interacción para registrar un abono. |
-| CP-026 | Pendiente | Caso pendiente de definir o implementar formalmente. |
+| CP-026 | tests/cp026-descargar-pdf-orden.js | Verifica la descarga del PDF de una orden desde el menú de tres puntos en Recepción de Vehículo. |
 
 ---
 

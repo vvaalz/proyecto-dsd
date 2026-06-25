@@ -71,3 +71,4 @@ node tests/cp016-chat-interno-orden.js
 | CP-014 | Cambio de vista de lista a caja | ✅ |
 | CP-015 | Cambio de sucursal desde el selector | ✅ |
 | CP-016 | Chat interno de una orden | ⚠️ |
+| CP-026 | Descargar PDF de una orden desde el menú de tres puntos (Recepción) | ✅ |
