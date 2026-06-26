@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node tests/cp035-generar-cotizacion-pos.js)",
+      "Bash(node tests/cp036-generar-apartado-pos.js)",
+      "Bash(node tests/cp037-facturacion-contado-efectivo.js)",
+      "Bash(node tests/cp038-facturacion-credito.js)",
+      "Bash(node -e ' *)",
+      "Bash(node tests/cp039-importar-factura-historico.js)",
+      "Bash(node tests/cp040-ver-apartados-pos.js)"
+    ]
+  }
+}

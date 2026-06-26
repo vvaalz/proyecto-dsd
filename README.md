@@ -76,3 +76,13 @@ node tests/cp016-chat-interno-orden.js
 | CP-028 | Ver bitácora de una orden desde Opciones avanzadas | ✅ |
 | CP-029 | Desactivar una orden de prueba desde Opciones avanzadas | ✅ |
 | CP-030 | Eliminar una orden de prueba desde Opciones avanzadas | ✅ |
+| CP-031 | Carga del módulo POS (Facturar): compañía, categorías y productos | ✅ |
+| CP-032 | Buscar un producto en el POS | ✅ |
+| CP-033 | Agregar un producto al carrito con precio correcto | ✅ |
+| CP-034 | Asociar un cliente a la factura del POS | ✅ |
+| CP-035 | Generar una cotización (Proforma) desde el POS | ✅ |
+| CP-036 | Generar un apartado desde el POS | ✅ |
+| CP-037 | Facturación de contado en efectivo (datos propios) | ✅ |
+| CP-038 | Facturación a crédito (datos propios) | ⚠️ |
+| CP-039 | Historial de facturas en el tab (F5) Importar factura | ✅ |
+| CP-040 | Lista de apartados en el tab (F7) Apartados | ✅ |
