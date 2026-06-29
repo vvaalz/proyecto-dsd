@@ -86,3 +86,20 @@ node tests/cp016-chat-interno-orden.js
 | CP-038 | Facturación a crédito (datos propios) | ⚠️ |
 | CP-039 | Historial de facturas en el tab (F5) Importar factura | ✅ |
 | CP-040 | Lista de apartados en el tab (F7) Apartados | ✅ |
+| CP-041 | Panel de totales del carrito (subtotal, IVA, descuento, devolución, utilidad, total) | ✅ |
+| CP-042 | Aplicar porcentaje de descuento al carrito | ✅ |
+| CP-043 | Selector de moneda (Colón, Dólar, Euro, Peso Dominicano) | ✅ |
+| CP-044 | Selector de formato de impresión de factura (9 formatos) | ✅ |
+| CP-045 | (F12) Abrir/Cerrar Caja | ✅ |
+| CP-046 | (F9) Movimientos de caja | ✅ |
+| CP-047 | (F8) Historial Mov. de Caja | ⚠️ |
+| CP-048 | Vista lista/grilla de productos en el buscador | ✅ |
+| CP-049 | Filtros de Vehículos (Marca, Modelo, Año, Transmisión, Motor, Categoría) | ✅ |
+| CP-050 | Menú de tres puntos del carrito | ✅ |
+| CP-051 | Producto Rápido (depende de selección de código CABYS) | ⚠️ |
+| CP-052 | Vaciar carrito | ✅ |
+| CP-053 | Tab (F2) Órdenes de caja | ✅ |
+| CP-054 | Tab (F3) Taller | ✅ |
+| CP-055 | Tab Tienda en línea | ✅ |
+| CP-056 | Tab Ruteo | ✅ |
+| CP-057 | Tab (F4) Cotización (listado) | ✅ |

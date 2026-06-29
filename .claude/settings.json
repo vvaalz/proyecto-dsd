@@ -7,7 +7,29 @@
       "Bash(node tests/cp038-facturacion-credito.js)",
       "Bash(node -e ' *)",
       "Bash(node tests/cp039-importar-factura-historico.js)",
-      "Bash(node tests/cp040-ver-apartados-pos.js)"
+      "Bash(node tests/cp040-ver-apartados-pos.js)",
+      "Bash(node tests/cp041-panel-totales-pos.js)",
+      "Bash(tasklist)",
+      "Bash(taskkill //F //IM chrome.exe //T)",
+      "Bash(node tests/cp042-aplicar-descuento-carrito.js)",
+      "Bash(node tests/cp043-cambio-moneda-pos.js)",
+      "Bash(node tests/cp044-formato-impresion-pos.js)",
+      "Bash(node tests/cp045-abrir-cerrar-caja.js)",
+      "Bash(node tests/cp046-movimientos-caja.js)",
+      "Bash(node tests/cp047-historial-movimientos-caja.js)",
+      "Bash(node tests/cp048-vista-lista-grilla-pos.js)",
+      "Bash(node tests/cp049-filtro-vehiculos-pos.js)",
+      "Bash(node tests/cp050-tres-puntos-carrito.js)",
+      "Bash(node tests/cp051-producto-rapido-pos.js)",
+      "Bash(timeout 60 node -e ' *)",
+      "Bash(timeout 50 node -e ' *)",
+      "PowerShell($pids = @\\(26824,19460,13160,28156,2012,31220,2244\\); foreach \\($p in $pids\\) { Stop-Process -Id $p -Force -ErrorAction SilentlyContinue }; Start-Sleep -Milliseconds 500; Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | Where-Object { $_.CommandLine -match 'test-type=webdriver|--remote-debugging-port|--enable-automation' } | Measure-Object | Select-Object Count)",
+      "Bash(node tests/cp052-vaciar-carrito-pos.js)",
+      "Bash(node tests/cp053-tab-ordenes-caja.js)",
+      "Bash(node tests/cp054-tab-taller-pos.js)",
+      "Bash(node tests/cp055-tab-tienda-linea.js)",
+      "Bash(node tests/cp056-tab-ruteo.js)",
+      "Bash(node tests/cp057-tab-cotizacion-f4.js)"
     ]
   }
 }
