@@ -29,7 +29,8 @@
       "Bash(node tests/cp054-tab-taller-pos.js)",
       "Bash(node tests/cp055-tab-tienda-linea.js)",
       "Bash(node tests/cp056-tab-ruteo.js)",
-      "Bash(node tests/cp057-tab-cotizacion-f4.js)"
+      "Bash(node tests/cp057-tab-cotizacion-f4.js)",
+      "Bash(node tests/cp058-facturar-producto-gravado.js)"
     ]
   }
 }

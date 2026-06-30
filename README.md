@@ -103,3 +103,19 @@ node tests/cp016-chat-interno-orden.js
 | CP-055 | Tab Tienda en línea | ✅ |
 | CP-056 | Tab Ruteo | ✅ |
 | CP-057 | Tab (F4) Cotización (listado) | ✅ |
+| CP-058 | Facturar producto existente gravado (con IVA) | ✅ |
+| CP-059 | Facturar producto existente exento (sin IVA) | ✅ |
+| CP-060 | Deshabilitar/habilitar la impresión (F8) y generar facturas en ambos estados | ✅ |
+| CP-061 | Facturar con múltiples métodos de pago (efectivo + tarjeta) | ✅ |
+| CP-062 | Facturar con un solo método de pago (tarjeta) | ✅ |
+| CP-063 | Agregar productos a una orden existente (Taller) y facturar | ✅ |
+| CP-064 | Agregar productos a una factura importada y facturar | ✅ |
+| CP-065 | Agregar productos al carrito en formato lista | ✅ |
+| CP-066 | Agregar productos al carrito en formato cuadrícula | ✅ |
+| CP-067 | Agregar comentario a un producto y facturar como Factura Electrónica | ✅ |
+| CP-068 | Agregar comentario a un producto y facturar como Tiquete Electrónico | ✅ |
+| CP-069 | Activar Factura por Contingencia y facturar (Tiquete Electrónico; Factura Electrónica queda bloqueada por validación de cliente) | ✅ |
+| CP-070 | Activar "Facturar al ICE" y validar aceptación por Hacienda (Factura Electrónica bloqueada; venta completada con Tiquete Electrónico; estado Hacienda no resuelto en ~75s) | ⚠️ |
+| CP-071 | Aplicar exoneración (2 productos: gravado x2 + exento x1) y validar aceptación por Hacienda (monto exonerado = IVA exacto, confirmado; Factura Electrónica bloqueada; venta completada con Tiquete Electrónico; estado Hacienda no resuelto en ~75s) | ⚠️ |
+| CP-072 | Verificar planillas de factura en Configuración → Admin. factura (tabs Factura/Proforma/Ticket, 36 opciones de plantilla, guardado: todo responde correctamente) — hallazgo de performance: la página tarda 12-18s en cargar (umbral ❌ es 8000ms), "Guardar" también lento (~7s) | ⚠️ |
+| CP-073 | Factura a crédito: 3 productos (AAA-Multímetro x1 gravado, AAA-Bombillos x1 exento, AA-Maletero x1 fracción) en colones — script verificado via inspección (defecto CP-038 corregido, crédito funciona, diálogo fraccionado usa prod_frag_q). Pendiente re-correr: el entorno QA estaba inestable (renderer crashes, carga POS >20s) al momento de generar este CP. | ⚠️ |
