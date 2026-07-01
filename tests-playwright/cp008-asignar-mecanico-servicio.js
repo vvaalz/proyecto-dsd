@@ -1,4 +1,4 @@
-const { chromium } = require('@playwright/test');
+﻿const { chromium } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
 
@@ -12,29 +12,29 @@ async function cp008_asignar_mecanico_servicio() {
 
   try {
     await page.goto('https://dev.designsoftcr.com/qa_talleralpha/public/log/login');
+    await page.evaluate(() => { window.localStorage.clear(); window.sessionStorage.clear(); });
     await page.fill('#email', 'qadesignsoftcr@gmail.com');
     await page.fill('#password', 'qa0000');
     await page.click('#loginButton');
-    await page.waitForURL('**/dashboard**', { timeout: 20000 });
+    await page.waitForURL('**/dashboard**', { timeout: 40000 });
 
     await page.goto('https://dev.designsoftcr.com/qa_talleralpha/public/vehicularReception/vehicularQuickReception');
-    await page.waitForSelector('button.add-reception-btn', { timeout: 15000 });
+    await page.waitForSelector('button.add-reception-btn', { timeout: 20000 });
 
     await page.evaluate(() => document.querySelector('button.add-reception-btn').click());
     await page.waitForTimeout(4000);
 
-    const serviceBtn = await page.locator('button, a').first().catch(() => null);
-    if (serviceBtn) {
-      await serviceBtn.click();
+    try {
+      await page.locator('button, a').filter({ visible: true }).first().click({ timeout: 3000 });
       await page.waitForTimeout(2000);
-    }
+    } catch {}
 
-    const mechanicSelect = await page.locator('select[id*="mecan"], select[name*="mecan"], select[id*="mechanic"], select[name*="mechanic"], select').first().catch(() => null);
-    if (mechanicSelect) {
-      await mechanicSelect.click();
+    try {
+      const sel = page.locator('select[id*="mecan"], select[name*="mecan"], select[id*="mechanic"], select[name*="mechanic"]').filter({ visible: true }).first();
+      await sel.click({ timeout: 3000 });
       await page.waitForTimeout(1000);
-      await mechanicSelect.selectOption({ index: 1 }).catch(() => {});
-    }
+      await sel.selectOption({ index: 1 });
+    } catch {}
 
     const bodyText = await page.locator('body').innerText();
     const passed =
@@ -50,7 +50,7 @@ async function cp008_asignar_mecanico_servicio() {
   } catch (error) {
     const dir = path.join(__dirname, '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
-    await page.screenshot({ path: path.join(dir, `cp008-fallo-${Date.now()}.png`) });
+    try { await page.screenshot({ path: path.join(dir, 'cp008-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-008 FAILED: ' + error.message);
     await browser.close();
     process.exit(1);

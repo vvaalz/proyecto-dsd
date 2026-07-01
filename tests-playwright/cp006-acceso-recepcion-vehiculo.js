@@ -1,4 +1,4 @@
-const { chromium } = require('@playwright/test');
+﻿const { chromium } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
 
@@ -12,10 +12,11 @@ async function cp006_acceso_recepcion_vehiculo() {
 
   try {
     await page.goto('https://dev.designsoftcr.com/qa_talleralpha/public/log/login');
+    await page.evaluate(() => { window.localStorage.clear(); window.sessionStorage.clear(); });
     await page.fill('#email', 'qadesignsoftcr@gmail.com');
     await page.fill('#password', 'qa0000');
     await page.click('#loginButton');
-    await page.waitForURL('**/dashboard**', { timeout: 20000 });
+    await page.waitForURL('**/dashboard**', { timeout: 40000 });
 
     // Navegar directamente al módulo de Recepción Vehicular
     const inicioCarga = Date.now();

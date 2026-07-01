@@ -1,4 +1,4 @@
-const { chromium } = require('@playwright/test');
+﻿const { chromium } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
 
@@ -13,6 +13,7 @@ async function cp002_login_invalido() {
   try {
     const inicio = Date.now();
     await page.goto('https://dev.designsoftcr.com/qa_talleralpha/public/log/login');
+    await page.evaluate(() => { window.localStorage.clear(); window.sessionStorage.clear(); });
     await page.waitForSelector('#loginButton');
     console.log(`⏱ Carga login: ${Date.now() - inicio}ms`);
 

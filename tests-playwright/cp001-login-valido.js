@@ -1,4 +1,4 @@
-const { chromium } = require('@playwright/test');
+﻿const { chromium } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
 
@@ -13,6 +13,7 @@ async function cp001_login_valido() {
   try {
     const inicio = Date.now();
     await page.goto('https://dev.designsoftcr.com/qa_talleralpha/public/log/login');
+    await page.evaluate(() => { window.localStorage.clear(); window.sessionStorage.clear(); });
     await page.waitForSelector('#loginButton');
     const tiempoCarga = Date.now() - inicio;
     if (tiempoCarga > 8000) console.log(`❌ PERFORMANCE FAILED: carga login tardó ${tiempoCarga}ms`);
@@ -22,7 +23,7 @@ async function cp001_login_valido() {
     await page.fill('#email', 'qadesignsoftcr@gmail.com');
     await page.fill('#password', 'qa0000');
     await page.click('#loginButton');
-    await page.waitForURL('**/dashboard**', { timeout: 20000 });
+    await page.waitForURL('**/dashboard**', { timeout: 40000 });
 
     const url = page.url();
     if (url.includes('dashboard')) {

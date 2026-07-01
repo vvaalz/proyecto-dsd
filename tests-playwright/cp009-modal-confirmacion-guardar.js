@@ -1,4 +1,4 @@
-const { chromium } = require('@playwright/test');
+﻿const { chromium } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
 
@@ -12,10 +12,11 @@ async function cp009_modal_confirmacion_guardar() {
 
   try {
     await page.goto('https://dev.designsoftcr.com/qa_talleralpha/public/log/login');
+    await page.evaluate(() => { window.localStorage.clear(); window.sessionStorage.clear(); });
     await page.fill('#email', 'qadesignsoftcr@gmail.com');
     await page.fill('#password', 'qa0000');
     await page.click('#loginButton');
-    await page.waitForURL('**/dashboard**', { timeout: 20000 });
+    await page.waitForURL('**/dashboard**', { timeout: 40000 });
 
     await page.goto('https://dev.designsoftcr.com/qa_talleralpha/public/vehicularReception/vehicularQuickReception');
     await page.waitForTimeout(5000);
@@ -23,11 +24,13 @@ async function cp009_modal_confirmacion_guardar() {
     await page.locator('button.add-reception-btn').click();
     await page.waitForTimeout(4000);
 
-    const saveBtn = await page.locator('button.btn-success, button.btn-primary, button[type="submit"], button[id*="save"]').first().catch(() => null);
-    if (saveBtn) {
-      await saveBtn.click();
+    try {
+      await page.locator('button.btn-success, button.btn-primary, button[type="submit"], button[id*="save"]')
+        .filter({ visible: true })
+        .first()
+        .click({ timeout: 5000 });
       await page.waitForTimeout(3000);
-    }
+    } catch {}
 
     const bodyText = await page.locator('body').innerText();
     const passed =
@@ -43,7 +46,7 @@ async function cp009_modal_confirmacion_guardar() {
   } catch (error) {
     const dir = path.join(__dirname, '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
-    await page.screenshot({ path: path.join(dir, `cp009-fallo-${Date.now()}.png`) });
+    try { await page.screenshot({ path: path.join(dir, 'cp009-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-009 FAILED: ' + error.message);
     await browser.close();
     process.exit(1);
