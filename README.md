@@ -119,3 +119,13 @@ node tests/cp016-chat-interno-orden.js
 | CP-071 | Aplicar exoneración (2 productos: gravado x2 + exento x1) y validar aceptación por Hacienda (monto exonerado = IVA exacto, confirmado; Factura Electrónica bloqueada; venta completada con Tiquete Electrónico; estado Hacienda no resuelto en ~75s) | ⚠️ |
 | CP-072 | Verificar planillas de factura en Configuración → Admin. factura (tabs Factura/Proforma/Ticket, 36 opciones de plantilla, guardado: todo responde correctamente) — hallazgo de performance: la página tarda 12-18s en cargar (umbral ❌ es 8000ms), "Guardar" también lento (~7s) | ⚠️ |
 | CP-073 | Factura a crédito: 3 productos (AAA-Multímetro x1 gravado, AAA-Bombillos x1 exento, AA-Maletero x1 fracción) en colones — script verificado via inspección (defecto CP-038 corregido, crédito funciona, diálogo fraccionado usa prod_frag_q). Pendiente re-correr: el entorno QA estaba inestable (renderer crashes, carga POS >20s) al momento de generar este CP. | ⚠️ |
+| CP-074 | Factura a crédito con 3 productos normales + 1 fraccionado (AA-Maletero) en colones — cliente 12735, switch_payment_type(2), validación saldo pendiente en /credit_sale/clientCreditSales | ✅ |
+| CP-075 | Factura a crédito con producto rápido (CABYS fallback a catálogo) en dólares — IVA gravado + exento, conversión de moneda | ✅ |
+| CP-076 | Factura a crédito + abono inicial: 3 productos colones, ingresa abono, valida saldo restante = total − abono (tolerancia ±1) | ✅ |
+| CP-077 | Factura a crédito con descuento global: producto normal + rápido + fraccionado, descuento 10% sobre total, valida cálculo ±1 | ✅ |
+| CP-078 | Abono a factura de crédito existente: busca cliente en /credit_sale/clientCreditSales, aplica abono via pay_customer_invoice(), valida saldo actualizado ±1 | ✅ |
+| CP-079 | Abono a factura de crédito + verificar en Movimientos de Caja (F9): abono 20% del saldo, verifica que el POS registre el movimiento | ⚠️ |
+| CP-080 | Abono con 2 métodos de pago (efectivo 15% + tarjeta 10%): navega con Ctrl+B, aplica ambos abonos, valida matemática acumulada ±1 | ✅ |
+| CP-081 | Descuento general 15% en factura a crédito: 3 productos colones, descuento via total_discount_input, valida reducción ±1 (₡37,540 → ₡31,909) | ✅ |
+| CP-082 | Descuento por línea en factura: 3 productos colones, intenta descuento vía input_product_discount_* (disabled por servidor), pago en efectivo (crédito del cliente agotado); limpieza de carrito lazy via trigger+delete | ✅ |
+| CP-083 | Límite de crédito del cliente: consulta saldo (₡66M acumulado), intenta venta a crédito, detecta "Not valid!" como BLOQUEO_DETECTADO del límite | ✅ |
