@@ -129,3 +129,10 @@ node tests/cp016-chat-interno-orden.js
 | CP-081 | Descuento general 15% en factura a crédito: 3 productos colones, descuento via total_discount_input, valida reducción ±1 (₡37,540 → ₡31,909) | ✅ |
 | CP-082 | Descuento por línea en factura: 3 productos colones, intenta descuento vía input_product_discount_* (disabled por servidor), pago en efectivo (crédito del cliente agotado); limpieza de carrito lazy via trigger+delete | ✅ |
 | CP-083 | Límite de crédito del cliente: consulta saldo (₡66M acumulado), intenta venta a crédito, detecta "Not valid!" como BLOQUEO_DETECTADO del límite | ✅ |
+| CP-084 | Historial de proformas (/proform/printPosProform): valida header "Cotizaciones", 7 elementos clave (receip_search, fechas, btn_search, 3 tabs tipo), Buscar funcional | ✅ |
+| CP-085 | Búsqueda en historial de proformas por código/número: usa receip_search + btn_search_receip, valida que el filtro se aplica | ✅ |
+| CP-086 | Proforma con cliente seleccionado: POS F4 → show_create_proform_modal() → dialog_proform, campo customer_proform_select, confirma con "Crear Proforma" | ✅ |
+| CP-087 | Proforma con productos del catálogo (fallback de rápidos): POS F4, 2 productos colones, modal dialog_proform, "Crear Proforma" | ✅ |
+| CP-088 | Proforma mixta en dólares: 2 productos existentes (Multímetro + Filtros), $123.26, "Crear Proforma" | ✅ |
+| CP-089 | Proforma con producto exento: AAA-Bombillos (exento) + AAA-Multímetro (gravado), crea proforma desde F4 | ✅ |
+| CP-090 | Proforma con descuento general 15%: 3 productos, total_discount_input, validación ±1 (₡56,285 → ₡47,842.25), luego crea proforma | ✅ |
