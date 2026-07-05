@@ -136,3 +136,11 @@ node tests/cp016-chat-interno-orden.js
 | CP-088 | Proforma mixta en dólares: 2 productos existentes (Multímetro + Filtros), $123.26, "Crear Proforma" | ✅ |
 | CP-089 | Proforma con producto exento: AAA-Bombillos (exento) + AAA-Multímetro (gravado), crea proforma desde F4 | ✅ |
 | CP-090 | Proforma con descuento general 15%: 3 productos, total_discount_input, validación ±1 (₡56,285 → ₡47,842.25), luego crea proforma | ✅ |
+| CP-091 | Proforma con descuentos individuales: 3 productos, intenta input_product_discount_TOKEN en modal (disabled server-side — limitación documentada), confirma "Crear Proforma" | ✅ |
+| CP-092 | Lista de precios en proforma normal: descubre 7 listas via menu_price_list, aplica "50% Descuento mayorista" via set_current_pos_price_list(185), valida precios carrito↔modal ±1 (productos AAA-* sin precio alternativo en QA), crea proforma | ✅ |
+| CP-093 | Lista de precios en proforma por consignación: aplica lista ID 186, activa ck_is_consignment_invoice (ck_is_proform__invoice se desmarca automáticamente), valida precios ±1, verifica tab "Prof. de Consignación" en historial | ✅ |
+| CP-094 | Proforma de taller convertida a orden: activa ck_is_workshop_proform, crea "Prof. de Taller", verifica tab en historial; botón de conversión a orden no encontrado en DOM — flujo documentado como no automatizable con onclick visible | ✅ |
+| CP-095 | Crear consignación normal: ck_is_consignment_invoice activado (exclusivo), total modal ₡56,185 = total POS, "Crear Proforma", tab "Prof. de Consignación" en historial con registros | ✅ |
+| CP-096 | Crear orden de consignación de taller: moneda dólares, ck_is_workshop_proform activado (exclusivo), $123.26, "Crear Proforma", tab "Prof. de Taller" con registros; input_product_edit_price_ muestra precio base sin IVA (diff ~13%) | ✅ |
+| CP-097 | Imprimir proforma: get_receip_detail(id) → panel de detalle → downloadProformPdf(id, true); popup capturado con "COTIZACIÓN N° 144", empresa, fechas y cliente; performance deficiente (~6 min renderizado PDF) | ⚠️ |
+| CP-098 | Comando rápido Shift+P en POS: abre #dialog_proform directamente (shortcut nativo confirmado), 2 productos del carrito en modal, tipo proforma por defecto, total ₡56,135, confirmado con "Crear Proforma" | ✅ |
