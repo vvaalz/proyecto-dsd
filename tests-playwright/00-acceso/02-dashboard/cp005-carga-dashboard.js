@@ -36,7 +36,7 @@ async function cp005_carga_dashboard() {
       throw new Error('El dashboard no cargó correctamente');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     await page.screenshot({ path: path.join(dir, `cp005-fallo-${Date.now()}.png`) });
     console.log('❌ CP-005 FAILED: ' + error.message);
