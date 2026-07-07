@@ -26,4 +26,12 @@ async function abrirContextoConSesion(browser) {
   return context;
 }
 
-module.exports = { abrirContextoConSesion, sesionVigente, SESION_PATH };
+async function refrescarConCacheLimpia(page) {
+  const client = await page.context().newCDPSession(page);
+  await client.send('Network.clearBrowserCache');
+  await client.send('Network.setCacheDisabled', { cacheDisabled: true });
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 });
+  await client.detach();
+}
+
+module.exports = { abrirContextoConSesion, sesionVigente, refrescarConCacheLimpia, SESION_PATH };

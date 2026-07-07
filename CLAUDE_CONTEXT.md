@@ -288,6 +288,13 @@ La suite en el repositorio actualmente contiene scripts para CP-001 a CP-025. El
 | CP-125 | tests-playwright/cp125-observaciones-factura.js | Campo de observación de venta: `#sale_observation` (textarea, placeholder "Observaciones de venta"), visible dentro de `dialog_payment` tras abrir el modal de pago. **Hallazgo de pago reproducible**: al facturar en efectivo, si solo se marca el checkbox `ck_is_payment_cash` sin llamar `switch_payment_type(1)` explícitamente, el sistema devuelve "! Not valid!" indefinidamente (probado sin cliente asociado y en colones y dólares — no es un problema de cliente ni de moneda). El orden correcto para confirmar "Su cambio es: X — Pagar (↵ ENTER)" es: click en `make_payment` → esperar ~1.5s → UN solo `Enter` → esperar ~1s → recién ahí entrar al loop que cierra sweet-alerts subsiguientes (mismo orden que CP-082; hacerlo en el mismo ciclo que el click genérico de botón termina clickeando "Cancel" por error). **Hallazgo secundario**: montos pequeños en Dólar Americano (ej. $0.55) devuelven "! Not valid!" de forma reproducible incluso con el monto exacto y sin cliente — no se pudo determinar la causa exacta (posible validación de monto mínimo o redondeo), se documenta y se factura en colones. La verificación de la observación en el detalle del historial (F5, `#dialog_invoice_import_detail_view`) no encontró el texto — puede que ese popup no incluya el campo; se envuelve en un `Promise.race` con timeout duro de 20s porque en un intento previo esa verificación quedó colgada sin explicación clara. |
 | CP-126 | tests-playwright/cp126-facturar-sinpe-movil.js | Método de pago SINPE Móvil: checkbox `is_payment_check` (nombre interno engañoso — NO es cheque, es SINPE) y su monto en `payment_check_total`. Los checkboxes de método de pago usan un slider CSS fuera del viewport del modal — hay que activarlos/desactivarlos con `page.evaluate(id => document.getElementById(id).click(), id)`, nunca con `page.locator().click()`. Hay que desactivar `is_payment_cash` (activo por defecto) ANTES de activar el método nuevo. `#payment_cash_total` es más confiable que `#total_sale_txt` para confirmar que el modal ya abrió (el segundo puede seguir hidden durante el render inicial). SINPE exige el monto EXACTO del total leído de `#total_sale_txt` (no admite exceso como efectivo). Pasó a la primera con 2 productos de catálogo + 1 rápido (CABYS falló, fallback a catálogo, mismo hallazgo que CP-051). |
 | CP-127 | tests-playwright/cp127-facturar-transaccion-bancaria.js | Método de pago transacción bancaria: checkbox `is_payment_transaction` y su monto en `payment_transaction_total`. Mismo patrón que CP-126 (activar/desactivar vía `page.evaluate` + click, monto exacto del total, `#payment_cash_total` como señal de modal abierto). Probado en dólares ($123.10) sin problemas — el hallazgo de "! Not valid!" en dólares documentado en CP-125 era específico de efectivo (`switch_payment_type`), no aplica a transacción bancaria. |
+| CP-128 | tests-playwright/cp128-carga-modulo-rutas.js | Primer CP con sesión reutilizable (`abrirContextoConSesion` + `refrescarConCacheLimpia`, ver sección "Autenticación en las pruebas" del README). Carga de `/route/adminRoute`: título, `#search_route`/`#btn_search_route`, `#btn_add_route`, listado `.pce-table` con ≥1 ruta. Tras `refrescarConCacheLimpia` la tabla tarda en poblarse vía AJAX — hace falta poll hasta que aparezca texto "clientes" antes de leer el estado. |
+| CP-129 | tests-playwright/cp129-crear-nueva-ruta.js | Crea ruta con nombre único (timestamp) + zona "Cedral" vía `#dialog_add_route`, confirma que el modal se cierra tras guardar y que la ruta aparece al buscarla por nombre tras refrescar. |
+| CP-130 | tests-playwright/cp130-validar-nombre-vacio.js | Intenta guardar `#dialog_add_route` con `#route_name_input` vacío — el modal permanece abierto (validación nativa) y el conteo de rutas no cambia. Caso de error/validación. |
+| CP-131 | tests-playwright/cp131-buscar-ruta-nombre.js | 3 búsquedas con `#search_route`/`#btn_search_route`: término existente (filtra), término inexistente (0 resultados), búsqueda vacía (restaura el listado completo). El texto de cada `<tr>` incluye el menú `.dropdown-menu` oculto (contiene "Asignar clientes/repartidores") — hay que clonar la fila y remover ese menú antes de leer el nombre real de la ruta, si no el nombre queda truncado/contaminado. |
+| CP-132 | tests-playwright/cp132-asignar-cliente-ruta.js | Crea una ruta fresca (0 clientes), abre "Asignar clientes" (`routeManager.showClientModal`), agrega el primer cliente seleccionable clickeando el ícono `i.fa-angle-double-right`, valida que el contador de la ruta pasa de 0 a 1 tras refrescar y volver a buscarla. |
+| CP-133 | tests-playwright/cp133-asignar-repartidor-ruta.js | Mismo patrón que CP-132 con `routeManager.showDealerModal` y `#dialog_add_dealer_route`. También valida que desaparece el texto "No hay repartidores vinculados" (validación secundaria, no bloqueante — puede tardar en re-renderizar). |
+| CP-134 | tests-playwright/cp134-editar-comision.js | Admin. Comisiones (`/route/adminCommission`): abre "Editar Comision" (`add_commission`), ingresa un monto aleatorio (100-500) en `#modal_input_commission_amount` SIN tocar el checkbox `#modal_ck_commission_value` (viene premarcado; clickearlo lo desmarca y oculta el campo), guarda con el botón `.btn-success` (sin `type="submit"`, no matchea ese selector) y valida que el valor persiste ±1 tras refrescar. Confirmado por red: `POST /route/updateDocumentCommission`. |
 
 ---
 
@@ -397,3 +404,51 @@ Rama principal actual:
 - Si se agregan nuevos casos, seguir el formato cpNNN-descripcion.js.
 - Si se mejora la arquitectura, mantener compatibilidad con runner.js.
 - Para depuración, ejecutar primero el caso individual antes de correr toda la suite.
+
+---
+
+## 14. Módulo Ruteo (CP-128 en adelante)
+
+Explorado con `auth/usar-sesion.js` (sesión reutilizable) el 2026-07-07. En el menú lateral el módulo aparece como **"Rutas"** (no "Ruteo"); es un acordeón con dos sub-ítems: "Admin. Rutas" y "Admin. Comisiones". El buscador rápido Ctrl+B del dashboard usa un input embebido `#quick_search` (distinto del `#dialog_quick_search` de POS) cuyos resultados devuelven `href="javascript:void(0);"` repetido en varios ítems — no sirve para hacer match por href, hay que clickear el link del sidebar por texto o navegar directo por URL.
+
+### URLs
+- Admin. Rutas: `https://dev.designsoftcr.com/qa_talleralpha/public/route/adminRoute`
+- Admin. Comisiones: `https://dev.designsoftcr.com/qa_talleralpha/public/route/adminCommission`
+- Dashboard (tras login): `https://dev.designsoftcr.com/qa_talleralpha/public/dash/dashboard` (¡`/public/dashboard` sin `dash/` da 404!)
+
+### Admin. Rutas — listado
+- `#search_route` (input, placeholder "Buscar ruta...") + `#btn_search_route`
+- `#btn_add_route` ("Agregar Nueva Ruta") → abre `#dialog_add_route`
+- Tabla `.pce-table`: cada fila = una ruta, con franja de color a la izquierda, nombre, badges "N Clientes" / "M Repartidores", y un botón `more_vert` (`button.mdl-button--icon[data-toggle="dropdown"]`) que despliega un `ul.dropdown-menu[role="menu"]` con 4 acciones (ojo: la primera exploración truncó el HTML del menú a 800 caracteres y solo mostró las primeras 2 — hay 2 más):
+  - "Asignar clientes" → `onclick="routeManager.showClientModal(ID_RUTA)"` → abre `#dialog_add_client_route`
+  - "Asignar repartidores" → `onclick="routeManager.showDealerModal(ID_RUTA)"` → abre `#dialog_add_dealer_route`
+  - "Editar ruta" → `onclick="routeManager.editRoute(ID_RUTA)"`
+  - "Eliminar la ruta" → `onclick="routeManager.confirmDeleteRoute(ID_RUTA)"`
+- **No existe campo de "estado" (activo/inactivo) para las rutas** — se confirmó explícitamente: no hay checkboxes/switches en la página, el nombre de la ruta no navega a ningún detalle (la fila `<tr>` no tiene onclick propio), y no hay ninguna mención de "estado/activo/inactivo/habilitar" en el texto visible de la pantalla.
+- Rutas existentes en QA: "RUTA 3" (id 39, 2 clientes/0 repartidores), "RUTA 2" (3 clientes/1 repartidor), "RUTA PUERTO VIEJO - SAN JOSÉ" (3 clientes/1 repartidor)
+
+### Modal "Agregar Nueva Ruta" (`#dialog_add_route`)
+- `#route_name_input` (text, requerido, placeholder "Ej: Ruta Centro")
+- `#route_zone_select` (select; en QA solo hay una zona real además del placeholder: value="19" text="Cedral")
+- `#btn_save_new_route` ("Guardar"), botón "Cancelar"
+- Validación: guardar con nombre vacío NO cierra el modal ni muestra sweet-alert — se queda abierto (validación nativa del campo requerido)
+
+### Modal "Asignar Clientes" (`#dialog_add_client_route`)
+- Layout de 2 columnas: "Todos los clientes seleccionables" (izquierda) / "Todos los clientes seleccionados" (derecha)
+- Izquierda: `#select_filter_canton_client`, `#select_filter_district_client`, `#input_search_internal_client` (placeholder "Buscar cliente..."), `#btn_search_client`. Cada fila de cliente tiene un ícono `i.fa-angle-double-right` (dentro de un `<td>`, sin `onclick` propio — el handler está delegado más arriba, un `.click()` normal sobre el ícono dispara el evento igual) para agregarlo a la ruta. El mismo ícono/patrón aplica en el modal de repartidores.
+- Derecha: `#select_filter_canton_client_linked`, `#select_filter_district_client_linked`, `#input_search_internal_client_linked` (placeholder "Buscar cliente seleccionado..."), `#btn_search_client_linked`. Los clientes ya asignados aparecen numerados con un ícono de arrastre (reordenar) y un ícono de basurero (desvincular).
+- Botón "Cerrar" (sin id propio localizado, buscar por texto)
+
+### Modal "Asignar Repartidores" (`#dialog_add_dealer_route`)
+- Mismo layout de 2 columnas pero sin filtros de cantón/distrito
+- Izquierda: `#input_search_internal_dealer` (placeholder "Buscar repartidor..."), `#btn_search_dealer`
+- Derecha: `#input_search_internal_dealer_linked` (placeholder "Buscar repartidor seleccionado..."), `#btn_search_dealer_linked`
+- Cuando no hay repartidores vinculados muestra el texto "No hay repartidores vinculados"
+
+### Admin. Comisiones (`/route/adminCommission`)
+- Tabla `#table_products` con una fila por tipo de documento: "Factura Electrónica", "Tiquete Electrónico", "Factura Interna" — cada una muestra "Tipo comisión: N/A / Valor: N/A" cuando no está configurada
+- Botón `#ddMenuList` (more_vert) por fila → menú con un solo ítem "Editar Comision" (`onclick="add_commission(ID)"`) → abre `#dialog_add_commission`
+  - `#modal_input_commission_amount` (text, placeholder "Valor en monto")
+  - Botón "Guardar" → `<button class="btn btn-success ..." onclick="save_document_commission()">` **sin `type="submit"`** — un selector `button[type="submit"]` nunca lo encuentra; hay que buscarlo por texto ("guardar") o por clase `.btn-success`. Botón "Salir" (`data-dismiss="modal"`, sin tipo tampoco).
+  - **Hallazgo/trampa**: el checkbox `#modal_ck_commission_value` ("Valor") YA viene marcado por defecto al abrir el modal. `switch_commission_option()` actúa como **toggle**, no como selección — clickearlo lo DESMARCA y oculta `#modal_commission_amount_content` (display:none), dejando el monto sin efecto aunque se llene. No hay que tocar ese checkbox si ya se quiere comisión por "Valor"; solo llenar `#modal_input_commission_amount` (vía JS directo: `el.value = X; el.dispatchEvent(new Event('input',{bubbles:true}))` — el campo puede no estar "visible" para Playwright en algunos casos por el toggle previo, así que `page.fill()` puede colgarse esperando visibilidad).
+  - Confirmado por red: guarda vía `POST /route/updateDocumentCommission` (`commission_type=0` para "Valor"), responde `{"success":true,"message":"Comisión actualizada correctamente"}`. El valor persiste y es legible tras refrescar en el texto de la fila ("Valor: NNN.00").

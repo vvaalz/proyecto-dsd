@@ -63,6 +63,16 @@ node tests/cp016-chat-interno-orden.js
     ```
   - Si la navegación redirige a `/log/login` (sesión expirada en el servidor), el CP debe borrar `auth/sesion-qa.json`, regenerar con `abrirContextoConSesion()` y reintentar la navegación una sola vez antes de fallar.
   - `auth/test-sesion.js` valida el flujo completo (generación automática + reutilización) y sirve de referencia.
+  - `auth/usar-sesion.js` también expone `refrescarConCacheLimpia(page)`: limpia la caché de red del navegador vía CDP (`Network.clearBrowserCache` + `Network.setCacheDisabled`) y recarga la página, sin afectar cookies ni la sesión activa. Se usa en los CPs del módulo Ruteo (CP-128 en adelante) justo después de navegar al módulo y antes de la lógica de cada prueba, para evitar que HTML/JS cacheado de una corrida anterior interfiera con la siguiente:
+    ```js
+    const { abrirContextoConSesion, refrescarConCacheLimpia } = require('../auth/usar-sesion');
+    const context = await abrirContextoConSesion(browser);
+    const page = await context.newPage();
+    await page.goto('https://dev.designsoftcr.com/qa_talleralpha/public/route/adminRoute',
+      { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await refrescarConCacheLimpia(page);
+    // ... lógica del CP ...
+    ```
 
 ## Casos de prueba implementados
 
@@ -190,3 +200,10 @@ node tests/cp016-chat-interno-orden.js
 | CP-125 | Agregar observaciones en factura: escribe en el textarea #sale_observation ("Observaciones de venta") dentro del modal de pago, factura en efectivo. Hallazgo: montos pequeños en Dólar Americano devuelven "! Not valid!" de forma reproducible al pagar (independiente del cliente) → se factura en colones. La observación no se pudo verificar textualmente en el detalle del historial (F5), documentado como hallazgo no bloqueante | ⚠️ |
 | CP-126 | Facturar con SINPE Móvil: 3 productos (2 catálogo + 1 rápido con fallback por CABYS inestable), desactiva efectivo y activa is_payment_check vía page.evaluate (checkbox slider fuera del viewport), monto exacto en payment_check_total = total leído de #total_sale_txt, factura confirmada ±1 | ✅ |
 | CP-127 | Facturar con transacción bancaria: 3 productos en dólares, desactiva efectivo y activa is_payment_transaction vía page.evaluate, monto exacto en payment_transaction_total = total leído de #total_sale_txt ($123.10), factura confirmada ±1 | ✅ |
+| CP-128 | Módulo Ruteo — Carga de Admin. Rutas (/route/adminRoute): título, buscador, botón "Agregar Nueva Ruta" y listado con rutas existentes visibles. Primer CP con sesión reutilizable (abrirContextoConSesion) en vez de login individual | ✅ |
+| CP-129 | Módulo Ruteo — Crear nueva ruta: nombre único + zona "Cedral", guarda y valida que aparece en el listado tras buscarla | ✅ |
+| CP-130 | Módulo Ruteo — Validación de nombre vacío: el formulario rechaza guardar sin nombre (el modal no se cierra) y no crea ninguna ruta nueva | ✅ |
+| CP-131 | Módulo Ruteo — Buscador de rutas por nombre: filtra correctamente un término existente, no devuelve resultados para uno inexistente, y restaura el listado completo al limpiar la búsqueda | ✅ |
+| CP-132 | Módulo Ruteo — Asignar cliente a una ruta: crea ruta fresca (0 clientes), agrega un cliente vía el ícono `fa-angle-double-right` en el modal "Asignar Clientes", valida que el contador pasa de 0 a 1 tras refrescar | ✅ |
+| CP-133 | Módulo Ruteo — Asignar repartidor a una ruta: mismo patrón que CP-132 con el modal "Asignar Repartidores", valida contador 0→1 y que desaparece el mensaje "No hay repartidores vinculados" | ✅ |
+| CP-134 | Módulo Ruteo — Editar comisión de repartidores (Admin. Comisiones): ingresa un monto aleatorio en el modal "Editar Comision" y valida que se guarda y persiste ±1 tras refrescar. Hallazgos: el checkbox "Valor" viene premarcado (clickearlo lo desmarca y oculta el campo), y el botón "Guardar" no tiene `type="submit"` | ✅ |
