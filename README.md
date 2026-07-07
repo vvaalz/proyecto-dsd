@@ -47,6 +47,23 @@ node tests/cp015-cambiar-sucursal-selector.js
 node tests/cp016-chat-interno-orden.js
 ```
 
+## Autenticación en las pruebas
+
+- **CP-001 a CP-127**: login individual completo en cada script (llenar `#email`/`#password`, click en `#loginButton`, esperar `**/dashboard**`). Es el patrón "legacy" — no se toca, ya está probado y funcionando.
+- **CP-128 en adelante**: usan sesión reutilizable vía `storageState` (Playwright) en lugar de loguearse de cero en cada script. El sistema vive en `auth/`:
+  - `auth/generar-sesion.js` — hace login una vez y guarda la sesión en `auth/sesion-qa.json` (ignorado por git, contiene tokens activos).
+  - `auth/usar-sesion.js` — expone `abrirContextoConSesion(browser)`: reutiliza la sesión si tiene menos de 2 horas, o la regenera automáticamente si no existe o está vencida.
+  - Uso en un CP nuevo:
+    ```js
+    const { abrirContextoConSesion } = require('../auth/usar-sesion');
+    const context = await abrirContextoConSesion(browser);
+    const page = await context.newPage();
+    await page.goto('https://dev.designsoftcr.com/qa_talleralpha/public/dash/dashboard',
+      { waitUntil: 'domcontentloaded', timeout: 60000 });
+    ```
+  - Si la navegación redirige a `/log/login` (sesión expirada en el servidor), el CP debe borrar `auth/sesion-qa.json`, regenerar con `abrirContextoConSesion()` y reintentar la navegación una sola vez antes de fallar.
+  - `auth/test-sesion.js` valida el flujo completo (generación automática + reutilización) y sirve de referencia.
+
 ## Casos de prueba implementados
 
 | Código | Descripción | Estado |

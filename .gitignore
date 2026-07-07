@@ -9,3 +9,6 @@ node_modules/
 
 # Screenshots de fallo generados durante las pruebas
 reports/screenshots/
+
+# Sesión de storageState (contiene tokens de sesión activos, NUNCA subir a GitHub)
+auth/sesion-qa.json
