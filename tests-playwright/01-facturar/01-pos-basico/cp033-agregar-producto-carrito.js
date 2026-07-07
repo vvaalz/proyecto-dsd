@@ -57,7 +57,7 @@ async function cp033_agregar_producto_carrito() {
       throw new Error('cartRow=' + JSON.stringify(cartRowFull ? cartRowFull.slice(0,100) : null) + ', cartTotal=' + cartTotal);
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp033-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-033 FAILED: ' + error.message);

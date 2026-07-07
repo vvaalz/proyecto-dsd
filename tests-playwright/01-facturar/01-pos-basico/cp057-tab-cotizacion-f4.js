@@ -4,8 +4,8 @@ const fs = require('fs');
 
 const POS = 'https://dev.designsoftcr.com/qa_talleralpha/public/pos/pointOfSale?company_pos=20&pos_type_option=1';
 
-async function cp055_tab_tienda_linea() {
-  console.log('🔄 Ejecutando CP-055: Verificar que el tab "Tienda en línea" cargue correctamente...');
+async function cp057_tab_cotizacion_f4() {
+  console.log('🔄 Ejecutando CP-057: Verificar que el tab (F4) Cotización cargue el listado de cotizaciones...');
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1200 } });
   await context.clearCookies();
@@ -24,28 +24,28 @@ async function cp055_tab_tienda_linea() {
     await page.waitForTimeout(3000);
     console.log('⏱ Carga POS: ' + (Date.now() - t0) + 'ms');
 
-    if (!(await page.evaluate(() => !!document.getElementById('btn_get_virtual_order_list')))) {
-      throw new Error('No se encontró el tab "Tienda en línea"');
+    if (!(await page.evaluate(() => !!document.getElementById('btn_proform_option')))) {
+      throw new Error('No se encontró el tab "(F4) Cotización"');
     }
     const t1 = Date.now();
-    await page.evaluate(() => document.getElementById('btn_get_virtual_order_list').click());
+    await page.evaluate(() => document.getElementById('btn_proform_option').click());
     await page.waitForTimeout(2500);
-    console.log('⏱ Cargar tab Tienda en línea: ' + (Date.now() - t1) + 'ms');
+    console.log('⏱ Cargar tab Cotización: ' + (Date.now() - t1) + 'ms');
 
     const bodyText = await page.locator('body').innerText();
-    const loaded = /[oó]rdenes pendientes/i.test(bodyText) && /[oó]rdenes aprobadas/i.test(bodyText);
+    const loaded = /cotizaci[oó]n #\d+/i.test(bodyText) || /no se encontraron/i.test(bodyText);
 
     if (loaded) {
-      console.log('✅ CP-055 PASSED: El tab "Tienda en línea" cargó correctamente');
+      console.log('✅ CP-057 PASSED: El tab "(F4) Cotización" cargó el listado de cotizaciones');
     } else {
-      throw new Error('El tab "Tienda en línea" no mostró contenido reconocible');
+      throw new Error('El tab "(F4) Cotización" no mostró el listado esperado');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
-    try { await page.screenshot({ path: path.join(dir, 'cp055-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
-    console.log('❌ CP-055 FAILED: ' + error.message);
+    try { await page.screenshot({ path: path.join(dir, 'cp057-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
+    console.log('❌ CP-057 FAILED: ' + error.message);
     process.exit(1);
   } finally { await browser.close(); }
 }
-cp055_tab_tienda_linea();
+cp057_tab_cotizacion_f4();

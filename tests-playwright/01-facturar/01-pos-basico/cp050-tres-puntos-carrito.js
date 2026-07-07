@@ -60,7 +60,7 @@ async function cp050_tres_puntos_carrito() {
       throw new Error('Faltan opciones en el menú: ' + JSON.stringify(missing));
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp050-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-050 FAILED: ' + error.message);

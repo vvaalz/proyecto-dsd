@@ -73,7 +73,7 @@ async function cp052_vaciar_carrito_pos() {
       throw new Error('El carrito no quedó vacío tras intentar vaciarlo');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp052-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-052 FAILED: ' + error.message);

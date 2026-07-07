@@ -83,7 +83,7 @@ async function cp051_producto_rapido_pos() {
       throw new Error('addedToCart=' + addedToCart + ', notInInventory=' + notInInventory);
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp051-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-051 FAILED: ' + error.message);

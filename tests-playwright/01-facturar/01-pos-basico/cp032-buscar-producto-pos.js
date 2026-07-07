@@ -45,7 +45,7 @@ async function cp032_buscar_producto_pos() {
       throw new Error('El producto buscado no aparece visible en los resultados');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp032-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-032 FAILED: ' + error.message);

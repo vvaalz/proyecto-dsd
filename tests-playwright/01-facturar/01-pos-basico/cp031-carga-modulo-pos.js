@@ -53,7 +53,7 @@ async function cp031_carga_modulo_pos() {
       throw new Error('showsCompany=' + showsCompany + ', showsCategories=' + showsCategories + ', showsProducts=' + showsProducts + '(count=' + productCount + ')');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp031-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-031 FAILED: ' + error.message);

@@ -48,7 +48,7 @@ async function cp040_ver_apartados_pos() {
       throw new Error('No se encontraron registros visibles en la lista de apartados tras abrir el tab');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp040-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-040 FAILED: ' + error.message);

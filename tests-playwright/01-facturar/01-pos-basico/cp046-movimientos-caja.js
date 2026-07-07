@@ -4,8 +4,8 @@ const fs = require('fs');
 
 const POS = 'https://dev.designsoftcr.com/qa_talleralpha/public/pos/pointOfSale?company_pos=20&pos_type_option=1';
 
-async function cp045_abrir_cerrar_caja() {
-  console.log('🔄 Ejecutando CP-045: Verificar que (F12) Abrir/Cerrar Caja abra el modal de gestión de caja...');
+async function cp046_movimientos_caja() {
+  console.log('🔄 Ejecutando CP-046: Verificar que (F9) Movimientos de caja cargue la pantalla de movimientos...');
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1200 } });
   await context.clearCookies();
@@ -31,31 +31,30 @@ async function cp045_abrir_cerrar_caja() {
       const isVis = (el) => { const r=el.getBoundingClientRect(),s=window.getComputedStyle(el); return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none'; };
       const menu = Array.from(document.querySelectorAll('.mdl-menu')).filter(isVis).find(m => /caja/i.test(m.textContent||''));
       if (!menu) return false;
-      const li = Array.from(menu.querySelectorAll('li')).find(el => /abrir\/cerrar caja/i.test(el.textContent||''));
+      const li = Array.from(menu.querySelectorAll('li')).find(el => /movimientos de caja/i.test(el.textContent||''));
       if (!li) return false;
       li.click(); return true;
     });
-    if (!clicked) throw new Error('No se encontró la opción "(F12) Abrir/Cerrar Caja" en el menú de Caja');
+    if (!clicked) throw new Error('No se encontró la opción "(F9) Movimientos de caja" en el menú de Caja');
     await page.waitForTimeout(2000);
 
     const modalOpen = await page.evaluate(() => {
       const isVis = (el) => { const r=el.getBoundingClientRect(),s=window.getComputedStyle(el); return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none'; };
-      const o = document.getElementById('dialog_cash_opening');
-      const c = document.getElementById('dialog_cash_closing');
-      return (o&&isVis(o))||(c&&isVis(c));
+      const m = document.getElementById('dialog_cash_movement');
+      return m ? isVis(m) : false;
     });
 
     if (modalOpen) {
-      console.log('✅ CP-045 PASSED: Se abrió el modal de gestión de caja (apertura o cierre, según el estado actual)');
+      console.log('✅ CP-046 PASSED: Se cargó la pantalla de "Movimientos de caja"');
     } else {
-      throw new Error('No se abrió ningún modal de gestión de caja');
+      throw new Error('No se cargó la pantalla de movimientos de caja');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
-    try { await page.screenshot({ path: path.join(dir, 'cp045-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
-    console.log('❌ CP-045 FAILED: ' + error.message);
+    try { await page.screenshot({ path: path.join(dir, 'cp046-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
+    console.log('❌ CP-046 FAILED: ' + error.message);
     process.exit(1);
   } finally { await browser.close(); }
 }
-cp045_abrir_cerrar_caja();
+cp046_movimientos_caja();

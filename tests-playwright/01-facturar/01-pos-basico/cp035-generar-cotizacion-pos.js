@@ -69,7 +69,7 @@ async function cp035_generar_cotizacion_pos() {
       throw new Error('No se abrió el modal de cotización (#dialog_proform)');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp035-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-035 FAILED: ' + error.message);

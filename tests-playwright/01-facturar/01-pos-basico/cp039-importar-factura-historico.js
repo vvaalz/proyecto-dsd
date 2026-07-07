@@ -48,7 +48,7 @@ async function cp039_importar_factura_historico() {
       throw new Error('No se encontraron registros visibles en el historial de facturas tras abrir el tab');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp039-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-039 FAILED: ' + error.message);

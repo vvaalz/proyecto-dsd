@@ -48,7 +48,7 @@ async function cp049_filtro_vehiculos_pos() {
       throw new Error('Faltan filtros en el panel: ' + JSON.stringify(missing));
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp049-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-049 FAILED: ' + error.message);

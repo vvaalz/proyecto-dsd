@@ -53,7 +53,7 @@ async function cp048_vista_lista_grilla_pos() {
       throw new Error('La visualización de productos no cambió al alternar entre lista y grilla');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp048-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-048 FAILED: ' + error.message);

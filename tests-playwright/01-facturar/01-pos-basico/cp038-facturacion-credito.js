@@ -73,7 +73,7 @@ async function cp038_facturacion_credito() {
       console.log('⚠️ CP-038 RESULT: Defecto confirmado en el sistema — switch_payment_type() revierte automáticamente el checkbox a Contado al intentar activar Crédito. Revisando el código fuente de la función en vivo, el bloque que aplica visualmente el cambio a Crédito está comentado (/* ... */); solo queda activa la rama que fuerza el regreso a Contado. No es posible facturar a crédito en este momento, independientemente del cliente asociado.');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp038-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-038 FAILED: ' + error.message);

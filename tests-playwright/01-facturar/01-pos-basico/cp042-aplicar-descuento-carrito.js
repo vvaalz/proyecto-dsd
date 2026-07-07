@@ -67,7 +67,7 @@ async function cp042_aplicar_descuento_carrito() {
       throw new Error('El total no cambió tras aplicar el descuento');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp042-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-042 FAILED: ' + error.message);

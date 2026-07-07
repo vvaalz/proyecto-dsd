@@ -4,8 +4,8 @@ const fs = require('fs');
 
 const POS = 'https://dev.designsoftcr.com/qa_talleralpha/public/pos/pointOfSale?company_pos=20&pos_type_option=1';
 
-async function cp057_tab_cotizacion_f4() {
-  console.log('🔄 Ejecutando CP-057: Verificar que el tab (F4) Cotización cargue el listado de cotizaciones...');
+async function cp056_tab_ruteo() {
+  console.log('🔄 Ejecutando CP-056: Verificar que el tab "Ruteo" cargue correctamente...');
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1200 } });
   await context.clearCookies();
@@ -24,28 +24,28 @@ async function cp057_tab_cotizacion_f4() {
     await page.waitForTimeout(3000);
     console.log('⏱ Carga POS: ' + (Date.now() - t0) + 'ms');
 
-    if (!(await page.evaluate(() => !!document.getElementById('btn_proform_option')))) {
-      throw new Error('No se encontró el tab "(F4) Cotización"');
+    if (!(await page.evaluate(() => !!document.getElementById('btn_routing_option')))) {
+      throw new Error('No se encontró el tab "Ruteo"');
     }
     const t1 = Date.now();
-    await page.evaluate(() => document.getElementById('btn_proform_option').click());
+    await page.evaluate(() => document.getElementById('btn_routing_option').click());
     await page.waitForTimeout(2500);
-    console.log('⏱ Cargar tab Cotización: ' + (Date.now() - t1) + 'ms');
+    console.log('⏱ Cargar tab Ruteo: ' + (Date.now() - t1) + 'ms');
 
     const bodyText = await page.locator('body').innerText();
-    const loaded = /cotizaci[oó]n #\d+/i.test(bodyText) || /no se encontraron/i.test(bodyText);
+    const loaded = /seleccionar ruta/i.test(bodyText) && /seleccionar repartidor/i.test(bodyText);
 
     if (loaded) {
-      console.log('✅ CP-057 PASSED: El tab "(F4) Cotización" cargó el listado de cotizaciones');
+      console.log('✅ CP-056 PASSED: El tab "Ruteo" cargó correctamente');
     } else {
-      throw new Error('El tab "(F4) Cotización" no mostró el listado esperado');
+      throw new Error('El tab "Ruteo" no mostró contenido reconocible');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
-    try { await page.screenshot({ path: path.join(dir, 'cp057-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
-    console.log('❌ CP-057 FAILED: ' + error.message);
+    try { await page.screenshot({ path: path.join(dir, 'cp056-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
+    console.log('❌ CP-056 FAILED: ' + error.message);
     process.exit(1);
   } finally { await browser.close(); }
 }
-cp057_tab_cotizacion_f4();
+cp056_tab_ruteo();
