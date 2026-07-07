@@ -295,6 +295,8 @@ La suite en el repositorio actualmente contiene scripts para CP-001 a CP-025. El
 | CP-132 | tests-playwright/cp132-asignar-cliente-ruta.js | Crea una ruta fresca (0 clientes), abre "Asignar clientes" (`routeManager.showClientModal`), agrega el primer cliente seleccionable clickeando el ícono `i.fa-angle-double-right`, valida que el contador de la ruta pasa de 0 a 1 tras refrescar y volver a buscarla. |
 | CP-133 | tests-playwright/cp133-asignar-repartidor-ruta.js | Mismo patrón que CP-132 con `routeManager.showDealerModal` y `#dialog_add_dealer_route`. También valida que desaparece el texto "No hay repartidores vinculados" (validación secundaria, no bloqueante — puede tardar en re-renderizar). |
 | CP-134 | tests-playwright/cp134-editar-comision.js | Admin. Comisiones (`/route/adminCommission`): abre "Editar Comision" (`add_commission`), ingresa un monto aleatorio (100-500) en `#modal_input_commission_amount` SIN tocar el checkbox `#modal_ck_commission_value` (viene premarcado; clickearlo lo desmarca y oculta el campo), guarda con el botón `.btn-success` (sin `type="submit"`, no matchea ese selector) y valida que el valor persiste ±1 tras refrescar. Confirmado por red: `POST /route/updateDocumentCommission`. |
+| CP-135 | tests-playwright/cp135-editar-ruta-existente.js | Crea ruta fresca, abre "Editar ruta" (edición inline, no modal — ver sección 14). Extrae el ID de la ruta desde `tr#tr_route_<ID>`, modifica `#input_route_name_<ID>` vía JS y guarda con el botón `tr#tr_route_<ID> button.btn-success` (`routeManager.saveRouteChange(id)`). Valida que el nombre nuevo persiste y el original ya no existe (usando coincidencia exacta, no `includes`, porque el nombre editado contiene el original como substring). |
+| CP-136 | tests-playwright/cp136-eliminar-ruta-existente.js | Crea una ruta descartable exclusiva ("... DESCARTABLE ..." + timestamp) para no arriesgar rutas de otros CPs — acción destructiva sin deshacer. Usa "Eliminar la ruta" → SweetAlert "¿Está seguro? Esta acción eliminará la ruta" con botones "Cancelar"/"Sí, eliminar" (buscar por texto). Confirmado por red: `POST /route/deleteRoute` → `{"success":true,"message":"Ruta eliminada correctamente"}`. Nota: el texto del SweetAlert a veces incluye ruido "! Not valid!" mezclado (boilerplate residual de otro diálogo) sin afectar el resultado — la validación usa un regex laxo (`/segur/i`), no comparación exacta. |
 
 ---
 
@@ -422,10 +424,23 @@ Explorado con `auth/usar-sesion.js` (sesión reutilizable) el 2026-07-07. En el 
 - Tabla `.pce-table`: cada fila = una ruta, con franja de color a la izquierda, nombre, badges "N Clientes" / "M Repartidores", y un botón `more_vert` (`button.mdl-button--icon[data-toggle="dropdown"]`) que despliega un `ul.dropdown-menu[role="menu"]` con 4 acciones (ojo: la primera exploración truncó el HTML del menú a 800 caracteres y solo mostró las primeras 2 — hay 2 más):
   - "Asignar clientes" → `onclick="routeManager.showClientModal(ID_RUTA)"` → abre `#dialog_add_client_route`
   - "Asignar repartidores" → `onclick="routeManager.showDealerModal(ID_RUTA)"` → abre `#dialog_add_dealer_route`
-  - "Editar ruta" → `onclick="routeManager.editRoute(ID_RUTA)"`
-  - "Eliminar la ruta" → `onclick="routeManager.confirmDeleteRoute(ID_RUTA)"`
+  - "Editar ruta" → `onclick="routeManager.editRoute(ID_RUTA)"` — **NO abre un modal**: convierte la fila `<tr>` en edición inline (ver detalle abajo)
+  - "Eliminar la ruta" → `onclick="routeManager.confirmDeleteRoute(ID_RUTA)"` → abre un SweetAlert de confirmación
 - **No existe campo de "estado" (activo/inactivo) para las rutas** — se confirmó explícitamente: no hay checkboxes/switches en la página, el nombre de la ruta no navega a ningún detalle (la fila `<tr>` no tiene onclick propio), y no hay ninguna mención de "estado/activo/inactivo/habilitar" en el texto visible de la pantalla.
 - Rutas existentes en QA: "RUTA 3" (id 39, 2 clientes/0 repartidores), "RUTA 2" (3 clientes/1 repartidor), "RUTA PUERTO VIEJO - SAN JOSÉ" (3 clientes/1 repartidor)
+
+### "Editar ruta" (edición inline, NO es un modal) — CP-135
+- Al hacer clic en "Editar ruta" del menú de acciones, la fila `<tr id="tr_route_<ID_RUTA>">` se reemplaza in-place por campos editables:
+  - `input#input_route_name_<ID_RUTA>` (nombre, texto plano)
+  - `select#c_zone_select_<ID_RUTA>` (zona)
+  - Botón guardar: `<button class="btn btn-success ..." onclick="routeManager.saveRouteChange(<ID_RUTA>)">` (ícono `i.fa-save`)
+  - Botón cancelar: `<button class="btn btn-default ..." onclick="routeManager.cancelEdit(<ID_RUTA>)">` (ícono `i.fa-times`)
+- El ID de la ruta se puede extraer del atributo `id` de la fila (`tr_route_50` → 50) o de cualquiera de los `onclick` de sus botones de acción (`routeManager.showClientModal(50)`, etc.)
+- Después de "saveRouteChange" hay que recargar/refrescar y volver a buscar la ruta para confirmar el nombre nuevo persistido — la fila vuelve a su vista normal (no-edición) sola tras guardar.
+
+### "Eliminar la ruta" (SweetAlert de confirmación) — CP-136
+- Al hacer clic en "Eliminar la ruta" se abre un `.sweet-alert` con ícono de advertencia: título "¿Está seguro?", texto "Esta acción eliminará la ruta", botones "Cancelar" y "Sí, eliminar" (buscar por texto, sin id propio)
+- Confirmado por red: `POST /route/deleteRoute` → `{"success":true,"message":"Ruta eliminada correctamente","data":1}`. Es una acción **destructiva sin deshacer** — solo usar sobre rutas creadas por el propio CP.
 
 ### Modal "Agregar Nueva Ruta" (`#dialog_add_route`)
 - `#route_name_input` (text, requerido, placeholder "Ej: Ruta Centro")
