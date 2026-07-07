@@ -27,7 +27,7 @@ async function cp003_campos_vacios() {
       throw new Error('El sistema permitió acceso sin credenciales');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     await page.screenshot({ path: path.join(dir, `cp003-fallo-${Date.now()}.png`) });
     console.log('❌ CP-003 FAILED: ' + error.message);

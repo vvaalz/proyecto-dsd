@@ -29,7 +29,7 @@ async function cp002_login_invalido() {
       throw new Error('El sistema permitió acceso con contraseña incorrecta');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     await page.screenshot({ path: path.join(dir, `cp002-fallo-${Date.now()}.png`) });
     console.log('❌ CP-002 FAILED: ' + error.message);

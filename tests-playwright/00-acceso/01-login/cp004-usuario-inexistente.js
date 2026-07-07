@@ -29,7 +29,7 @@ async function cp004_usuario_inexistente() {
       throw new Error('El sistema permitió acceso con usuario inexistente');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     await page.screenshot({ path: path.join(dir, `cp004-fallo-${Date.now()}.png`) });
     console.log('❌ CP-004 FAILED: ' + error.message);

@@ -32,7 +32,7 @@ async function cp001_login_valido() {
       throw new Error('No redirigió al dashboard (URL actual: ' + url + ')');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     await page.screenshot({ path: path.join(dir, `cp001-fallo-${Date.now()}.png`) });
     console.log('❌ CP-001 FAILED: ' + error.message);
