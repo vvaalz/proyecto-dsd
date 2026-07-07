@@ -418,6 +418,12 @@ Explorado con `auth/usar-sesion.js` (sesión reutilizable) el 2026-07-07. En el 
 - Admin. Comisiones: `https://dev.designsoftcr.com/qa_talleralpha/public/route/adminCommission`
 - Dashboard (tras login): `https://dev.designsoftcr.com/qa_talleralpha/public/dash/dashboard` (¡`/public/dashboard` sin `dash/` da 404!)
 
+### Admin. Rutas — filtros/búsqueda (barrido completo, 2026-07-07)
+- **Único filtro real de la pantalla**: `#search_route` (input de texto, placeholder "Buscar ruta...") + `#btn_search_route` — busca por nombre de ruta, ya cubierto en detalle por CP-131 (término existente, inexistente, limpiar búsqueda).
+- **No hay ningún otro control de filtrado** para rutas: se inspeccionó exhaustivamente la barra completa (todos los `input`/`select`/`button`/checkbox visibles antes de la tabla `.pce-table`) y no existe filtro por zona, por cliente, por repartidor asignado, ni por estado.
+- El dropdown visible como **"Compañía" (ej. "TALLER ALPHA PREMIUM")** que aparece junto al buscador NO es un filtro de rutas — es el **selector global de compañía/tenant** compartido por el header de la app (mismo widget y mismas opciones que en el dashboard: TALLER ALPHA PREMIUM, ACTUALIZACIÓN DE TALLER ALPHA, COLOMBIA, COMPAÑÍA CONTABILIDAD, Design Soft, El Salvador, HONDURAS, MAKAN DEMO DE GUATEMALA, Panama 2, etc.). No es un `<select>` nativo — es un widget custom (no se encontró vía `document.querySelectorAll('select')`, hubo que clickearlo por coordenadas de pantalla). Cambiarlo navegaría a un contexto de compañía totalmente distinto (out of scope — todos los CPs 001-136 asumen "TALLER ALPHA PREMIUM").
+- Conclusión: la cobertura de filtrado de CP-131 (búsqueda por nombre) ya es completa para este módulo; no hay superficie adicional de filtros que cubrir con nuevos CPs.
+
 ### Admin. Rutas — listado
 - `#search_route` (input, placeholder "Buscar ruta...") + `#btn_search_route`
 - `#btn_add_route` ("Agregar Nueva Ruta") → abre `#dialog_add_route`
