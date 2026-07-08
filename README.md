@@ -68,8 +68,11 @@ Cada CP nuevo debe ubicarse en la subcarpeta de su módulo/submódulo real (ver 
 | 02-gestion-taller | 01-recepcion-vehiculo | CP-006 – CP-016 | `tests-playwright/02-gestion-taller/01-recepcion-vehiculo/` |
 | 02-gestion-taller | 02-taller-basico | CP-017 – CP-030 | `tests-playwright/02-gestion-taller/02-taller-basico/` |
 | 03-rutas | 01-admin-rutas | CP-128 – CP-136 | `tests-playwright/03-rutas/01-admin-rutas/` |
+| 04-panel-control | 01-general | CP-146 – CP-149 | `tests-playwright/04-panel-control/01-general/` |
 
 Nota: "01-facturar/09-ruteo-pos" (órdenes de ruteo creadas desde el POS) es un módulo distinto de "03-rutas/01-admin-rutas" (administración de rutas/zonas/clientes/repartidores) — ver la distinción completa en `CLAUDE_CONTEXT.md` secciones 14 y 15.
+
+"04-panel-control" (`/sett/setting`) está en construcción — de los ~26 CPs propuestos, por ahora solo está implementado el bloque de carga/navegación/hallazgos (CP-146–149); el bloque grande de las 19 secciones de configuración del acordeón y el tab Tienda online quedan pendientes (ver `CLAUDE_CONTEXT.md` sección 19).
 
 ## Autenticación en las pruebas
 
@@ -261,3 +264,7 @@ Esto lee `reports/tiempos-ejecucion.json` y genera `reports/reporte-tiempos.html
 | CP-143 | Ruteo dentro de POS — Editar orden de ruteo existente: crea orden propia, usa "Editar órden" del menú `more_vert` (`show_create_routing_order_modal(id)`, reutiliza el mismo modal de creación pre-poblado), modifica la observación y valida que el cambio persiste en la tarjeta tras guardar | ✅ |
 | CP-144 | Ruteo dentro de POS — Marcar orden como ENTREGADO: crea orden propia, la marca "EN CAMINO" (`change_routing_order_status(id, 2)`) y luego "ENTREGADO" (`change_routing_order_status(id, 3)`), valida que aparece en el filtro "Entregado" y ya no en "Pendientes"/"En Camino" | ✅ |
 | CP-145 | Ruteo dentro de POS — Eliminar orden de ruteo existente: crea una orden descartable exclusiva para este CP, usa "Eliminar órden" del menú `more_vert` (`show_confirm_delete_routing_order(id)`), confirma el SweetAlert "¿Estás seguro de eliminar la órden?" por texto exacto "Eliminar", valida que la tarjeta ya no aparece en el tablero. Nunca toca órdenes de otros CPs | ✅ |
+| CP-146 | Panel de Control — Carga del módulo (`/sett/setting`): valida título de página, las 3 pestañas (Dashboard/Tienda online/Twilio), buscador de configuraciones y botón "Guardar" presentes, y ≥15 secciones en el acordeón del tab Dashboard | ✅ |
+| CP-147 | Panel de Control — Navegación entre pestañas: confirma que Dashboard↔Tienda online cambian correctamente de contenido, y que el click en "Twilio" no produce ningún cambio (hallazgo, ver CP-148) | ✅ |
+| CP-148 | Panel de Control — Investigación del tab "Twilio": confirma con 3 intentos de click, captura de errores de consola y diálogos nativos que el link `#twilio_config` no crea su `.tab-pane`, no cambia la URL y no rompe el resto del módulo — documentado como hallazgo (link no funcional en este entorno de QA) | ⚠️ |
+| CP-149 | Panel de Control — Buscador de configuraciones (`#input_search_setting`): confirma que escribir un término (ej. "comisiones") NO filtra las secciones visibles del acordeón (siguen todas visibles); limpiar el campo sí restaura el listado. Documentado como hallazgo | ⚠️ |

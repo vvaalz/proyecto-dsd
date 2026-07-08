@@ -365,6 +365,10 @@ La suite en el repositorio contiene actualmente los CP-001 a CP-145, organizados
 | CP-143 | tests-playwright/01-facturar/09-ruteo-pos/cp143-editar-orden-ruteo.js | Editar orden de ruteo (dentro del POS, distinto de "Editar ruta" de Admin. Rutas/CP-135). Crea orden propia, ejecuta `show_create_routing_order_modal(id)` desde el menú `more_vert` → **confirmado en vivo**: reutiliza el mismo modal `#dialog_add_routing_order` de la creación, con los campos YA pre-poblados (`send_routing_order_observation`, `send_routing_order_route`, `send_routing_order_agent_assigned` traen los valores existentes de la orden). Modifica solo la observación, guarda con el mismo botón `#send_routing_order` ("Enviar Orden") y confirma el mismo SweetAlert "¿Enviar órden a ruteo?" — el flujo de guardado de edición es idéntico al de creación, no hay un botón "Actualizar" separado. Valida que la nueva observación reemplaza a la anterior en la tarjeta del tablero. |
 | CP-144 | tests-playwright/01-facturar/09-ruteo-pos/cp144-marcar-entregado.js | Marcar orden como ENTREGADO (dentro del POS). Crea orden propia, aplica `change_routing_order_status(id, 2)` ("EN CAMINO") y luego `change_routing_order_status(id, 3)` ("ENTREGADO") — **confirmado**: el sistema permite llamar ambas transiciones en secuencia sin bloqueos ni SweetAlert de confirmación adicional (solo un breve delay tras cada llamada). Valida el resultado con los filtros `filter_routing_order_btn_delivered` (aparece) y `filter_routing_order_btn_pending`/`filter_routing_order_btn_in_route` (ya no aparece) tras `refrescarConCacheLimpia`. |
 | CP-145 | tests-playwright/01-facturar/09-ruteo-pos/cp145-eliminar-orden-ruteo.js | Eliminar orden de ruteo (dentro del POS, distinto de "Eliminar ruta" de Admin. Rutas/CP-136). Crea una orden descartable exclusiva ("... DESCARTABLE ..." + timestamp) — acción destructiva sin deshacer, nunca reutiliza órdenes de otros CPs. Ejecuta `show_confirm_delete_routing_order(id)` → SweetAlert **"Eliminar órden — ¿Estás seguro de eliminar la órden?"** con botones "Cancelar"/"Eliminar" (mismo ruido cosmético "! Not valid!" mezclado que en otros SweetAlerts del sistema, ver CP-136) — confirmar por texto exacto `/^\s*(eliminar|confirmar|s[ií]|aceptar)\s*$/i`, nunca con un selector genérico que pueda pegarle a "Cancelar". Tras confirmar, la tarjeta desaparece del tablero de inmediato y se mantiene ausente tras `refrescarConCacheLimpia`. |
+| CP-146 | tests-playwright/04-panel-control/01-general/cp146-carga-modulo-panel-control.js | Carga de `/sett/setting`: valida título "Panel de Control", las 3 pestañas (`#dash`/`#store`/`#twilio_config`), buscador `#input_search_setting`, botón `#save_settings` y ≥15 secciones del acordeón (`[id^="dashboard_button_setting_"]`, hay 21 en total). Primer CP del módulo Panel de Control, ver sección 19. |
+| CP-147 | tests-playwright/04-panel-control/01-general/cp147-navegacion-pestanas-panel-control.js | Navegación entre pestañas: Dashboard↔Tienda online cambian correctamente la clase `.active` del `.tab-pane` correspondiente. Confirma también (verificación rápida) que el click en "Twilio" no cambia nada — el hallazgo completo se investiga a fondo en CP-148. |
+| CP-148 | tests-playwright/04-panel-control/01-general/cp148-tab-twilio-no-funcional.js | Investigación dedicada del tab "Twilio": 3 intentos de click, captura de `page.on('console')`/`page.on('dialog')`, comparación de URL y de la lista de `.tab-pane` antes/después. Confirma que es un link roto/no habilitado en este entorno (sin errores de consola, sin diálogos, sin romper el resto del módulo) — documentado como ⚠️ hallazgo, no como fallo. |
+| CP-149 | tests-playwright/04-panel-control/01-general/cp149-buscador-configuraciones-no-filtra.js | Buscador `#input_search_setting`: escribe "comisiones" y cuenta secciones visibles del acordeón antes/después — confirma que las 18 secciones visibles siguen todas visibles (no filtra), y que limpiar el campo restaura el listado sin romper nada. Documentado como ⚠️ hallazgo. Si en el futuro se corrige el buscador, este CP pasará a ✅ automáticamente (la validación de "sí filtra" ya está codificada como camino alternativo). |
 
 ---
 
@@ -684,3 +688,64 @@ Si `reports/tiempos-ejecucion.json` no existe todavía (ningún CP nuevo corrió
 - `reports/tiempos-ejecucion.json` y `reports/reporte-tiempos.html` están en `.gitignore` — son datos locales/regenerables de cada máquina, igual que `reports/screenshots/`, no se versionan.
 - No hay lock/mutex contra escrituras concurrentes — asumido seguro porque los CPs de este proyecto se corren de a uno por vez (`node <ruta>`), nunca en paralelo real.
 - Ver la plantilla actualizada del skill `crear-caso-prueba` para el patrón exacto de integración (dónde va la llamada, cómo se captura `tiempoInicioCP`).
+
+---
+
+## 19. Panel de Control (exploración 2026-07-08, CP-146 en adelante)
+
+Explorado vía `abrirContextoConSesion` + navegación directa (sin pasar por el ítem del menú lateral, que está oculto dentro de un acordeón colapsado — el `<a>` real tiene `href` fijo, no hace falta expandir el menú para llegar).
+
+### Ubicación y estructura general
+- URL: `${BASE_URL}/sett/setting` (título de página: "Panel de Control | Sistema Web ERP").
+- Ojo: en el menú lateral hay **3 ítems distintos** con "Panel de Control" en el texto — no confundir:
+  - **"Panel de control"** → `/sett/setting` — **este es el módulo**, configuración general del sistema.
+  - "Panel de Control" → `/soSetting/storeOnlineSetting` — configuración de Tienda en línea, un módulo aparte (no explorado, no confundir con el tab "Tienda online" que SÍ vive dentro de `/sett/setting`).
+  - "Panel de Control de Solicitudes" → `/hr_pay_man/hr_payroll_approval_panel` — panel de aprobación de solicitudes de RRHH, módulo totalmente distinto.
+- `/sett/setting` tiene 3 pestañas (`.nav-tabs a[data-toggle="tab"]`): **Dashboard** (`href="#dash"`, activa por defecto), **Tienda online** (`href="#store"`), **Twilio** (`href="#twilio_config"`).
+- Un popup de notificaciones del navegador puede aparecer al cargar (`#workshop-web-notification-permission-dismiss` para cerrarlo) — mismo patrón visto en otros módulos POS.
+
+### Tab "Dashboard" (`#dash`) — acordeón de 21 secciones de configuración
+Patrón por sección: header clicable `#dashboard_button_setting_N` (con `data-target="#dashboard_content_settings_N"`) que expande/colapsa `#dashboard_content_settings_N` (inicia `style="display:none"`). **Un solo botón "Guardar" compartido** (`#save_settings`, clase `btn btn-success _btn_15`) al final de la página guarda TODAS las secciones a la vez — no hay guardado independiente por sección. Los números de sección (N) no son estrictamente correlativos con el orden visual (la sección 20 "Configuración general de comisiones" aparece visualmente entre la 8 y la 9).
+
+Secciones encontradas (nombre — cantidad de campos input/select/textarea):
+1. Dashboard — 12 (incluye `#language_select`: English/Español/Chino, tipo Chosen)
+2. Impresión de factura de ventas — 58 (la más grande junto con la 8)
+3. Impresión de cierres de caja — 15
+4. Configuración de inventario — 18
+5. Configuración del sistema POS (Punto de venta) — 57
+6. Recepción vehicular — 40
+7. Envío de facturas por correo — 4
+8. Configuración general de ventas — **91** (la sección más grande de todo el panel)
+20. Configuración general de comisiones — 9. Campos confirmados: "Comisión por Venta" (input numérico), "Comisión por Cobro" (input numérico), toggle "Activar comisión por rol Mecánico" (`#enable_mechanic_role_commission`, apagado por defecto) que al activarse revela 3 campos adicionales por rol (`#mechanic_role_commission_cash_percent`, `_card_percent`, `_mixed_percent`).
+9. Ventas de Crédito — 11
+10. Plantillas pdf de las órdenes — 20
+11. Tracking de órdenes online para clientes — 31
+12. Configuracíon ASADA — 8 (sic, con acento mal puesto en el HTML real — específico de un ente regulador de agua/instituciones de Costa Rica)
+13. Activación de módulos para mobile — 4, pero **no tiene flecha de acordeón, tiene un ícono de teléfono** — parece ser un teaser de "contactar para activar", no una sección expandible normal; verificar antes de tratarla como sección editable.
+14. Consecutivos Comprobante Fiscal — 4
+15. Consecutivos Comprobantes — **0 campos** (sección vacía o de solo lectura — verificar si realmente no tiene contenido o si carga vía AJAX bajo demanda)
+16. Personalizar términos y condiciones de la firma, para la recepción de vehículos App — 6
+17. Compras — 11
+18. Compras externas — 2
+19. Fidelidad de clientes — 2
+21. Módulo de Crédito para clientes — 4
+
+### Tab "Tienda online" (`#store`)
+11 campos, botón de guardado propio `#save_settings_store` (`<button type="submit">`), **independiente** del `#save_settings` del tab Dashboard. Campos: `#company_store_online_select`, `#currency_select` (select-multiple), `#color_select`, 2 inputs de texto sin id fijo, `#file_header`/`#file_footer` (carga de archivos), `#enable_newsletter` (checkbox).
+
+### Tab "Twilio" (`#twilio_config`) — ⚠️ HALLAZGO: no funcional en este entorno — **confirmado en CP-148**
+Al clickear el `<a href="#twilio_config">`, **no pasa nada observable**: no cambia la URL, no aparece ningún `.tab-pane` con id `twilio_config` en el DOM (solo existen `#dash` y `#store` como `.tab-pane` reales), no hay error de consola ni diálogo nativo. CP-148 lo confirmó con 3 intentos de click + captura de `console`/`dialog` + comparación de estado antes/después: el resultado es idéntico en los 3 intentos, y el resto del módulo (Dashboard) no queda roto tras los clicks. Es decir, el tab "Twilio" es un link roto o placeholder en este entorno de QA (posiblemente una integración no habilitada para esta compañía) — no un problema del script.
+
+### Buscador de configuraciones — ⚠️ HALLAZGO: no filtra — **confirmado en CP-149**
+`#input_search_setting` (placeholder "Buscar en las configuraciones") existe y acepta texto, pero **no filtra visualmente las secciones del acordeón**: CP-149 escribió "comisiones" (término que debería coincidir con una sola sección, "Configuración general de comisiones") y las 18 secciones visibles antes de buscar siguieron las 18 visibles después, sin ocultar ninguna. Limpiar el campo sí restaura el listado sin dejar la pantalla en un estado roto. CP-149 quedó escrito para pasar a ✅ automáticamente el día que se corrija el filtrado (la validación positiva ya está codificada como camino alternativo, no hace falta reescribir el CP).
+
+### Notas para el diseño de CPs
+- Dado el tamaño de algunas secciones (91 y 58 campos), no tiene sentido probar campo por campo — el patrón realista por sección es: expandir → cambiar UN campo representativo (o activar un toggle) → guardar con el botón compartido `#save_settings` → refrescar y verificar que el valor persiste.
+- Como el guardado es compartido entre TODAS las secciones del tab Dashboard, hay que tener cuidado de no dejar cambios de una sección afectando la corriente de otro CP — cada CP que modifique un valor debería idealmente restaurar el valor original al final, o usar campos que no rompan otros módulos si quedan modificados (similar al cuidado ya aplicado con datos descartables en otros módulos).
+
+### Estado de implementación (actualizado 2026-07-08)
+Propuesta original de ~26 CPs organizada en 4 bloques — solo el primero está implementado:
+- **Bloque A (carga + navegación) — ✅ implementado**: CP-146 (carga del módulo), CP-147 (navegación entre pestañas).
+- **Bloque D (hallazgos) — ✅ implementado**: CP-148 (Twilio no funcional), CP-149 (buscador no filtra).
+- **Bloque B (19 secciones del acordeón Dashboard) — pendiente**: un CP por sección (expandir/editar/guardar/persistir), la sección de comisiones (20) ya está bien caracterizada arriba y es la candidata más simple para empezar.
+- **Bloque C (tab Tienda online) — pendiente**: carga, editar+guardar (`#save_settings_store`), posible CP de carga de archivos (`#file_header`/`#file_footer`).
