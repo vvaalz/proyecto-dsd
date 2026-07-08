@@ -89,66 +89,127 @@ Notas:
 - Uso de snake_case para funciones.
 
 ### Estructura del código
+**Actualizado 2026-07-08** — la suite activa usa Playwright, no Selenium (ver sección 4 para el patrón real y actualizado).
 - Los scripts usan async/await.
 - La lógica se organiza en funciones asíncronas.
-- El patrón estándar es:
-  1. Crear el driver de Selenium.
-  2. Abrir la URL de login.
-  3. Autenticar con credenciales de prueba.
-  4. Navegar al módulo correspondiente.
-  5. Esperar por elementos o URL esperada.
-  6. Ejecutar la validación.
-  7. Registrar resultado en consola.
-  8. Cerrar el driver en finally.
+- El patrón estándar (CP-128 en adelante, y el que debe seguir todo CP nuevo) es:
+  1. Lanzar `chromium.launch()`.
+  2. Obtener un contexto con sesión reutilizable vía `abrirContextoConSesion(browser)` (`auth/usar-sesion.js`) — no login manual.
+  3. Navegar al módulo correspondiente (con reintento automático si la sesión expiró — patrón `navegarAModulo`).
+  4. Ejecutar `refrescarConCacheLimpia(page)` para evitar HTML/JS cacheado de una corrida anterior.
+  5. Esperar por elementos o estado esperado del módulo.
+  6. Ejecutar la lógica y validaciones del caso.
+  7. Registrar resultado en consola (`✅ PASSED` / `⚠️ RESULT` / `❌ FAILED`).
+  8. Cerrar el browser en `finally` (`browser.close()`).
+  - CP-001 a CP-127 usan una variante "legacy" de este mismo patrón con login manual (`#email`/`#password`/`#loginButton`) en vez de sesión reutilizable — ya están congelados, no se tocan, y no es el patrón a replicar en CPs nuevos.
 
 ### Manejo de errores
-- El patrón típico es try/catch/finally.
-- Los fallos se registran con mensajes claros en consola.
-- En varios scripts se usa process.exit(1) cuando una validación no se cumple.
+- El patrón típico es try/catch/finally, con `browser.close()` en el finally.
+- Los fallos se registran con mensajes claros en consola y toman un screenshot (`screenshotOnFail`) antes de salir.
+- Se usa `process.exit(1)` cuando una validación crítica no se cumple.
+- Si una acción puede disparar una llamada AJAX síncrona del lado de la app (pagos, cierres de caja, confirmaciones contra el servidor), envolver ese `page.evaluate()` con un timeout explícito (`evaluateConTimeout`, ver hallazgo CP-107/CP-108 más abajo) para fallar rápido con mensaje claro en vez de colgarse indefinidamente si el servidor no responde.
 
 ---
 
 ## 4. Patrón de código estándar de los casos de prueba
 
-Los casos siguen este esquema base:
+**Actualizado 2026-07-08.** Este es el patrón vigente en Playwright (no Selenium) que debe seguir todo CP nuevo — es el mismo que genera el skill `crear-caso-prueba`. Basado en el patrón real usado en CP-137 y siguientes:
 
 ```javascript
-const { Builder, By, until } = require('selenium-webdriver');
+const { chromium } = require('@playwright/test');
+const path = require('path');
+const fs = require('fs');
+const { abrirContextoConSesion, refrescarConCacheLimpia, SESION_PATH } = require('../../../auth/usar-sesion');
 
-async function cp001_login_valido() {
-  console.log('🔄 Ejecutando CP-001: Login con credenciales válidas...');
+const URL_MODULO = 'https://dev.designsoftcr.com/qa_talleralpha/public/URL_DEL_MODULO';
 
-  let driver = await new Builder().forBrowser('chrome').build();
+const screenshotOnFail = async (page, name) => {
+  try { const dir = path.join(__dirname,'..','..','..','reports','screenshots'); fs.mkdirSync(dir,{recursive:true}); await page.screenshot({path:path.join(dir,name+'-'+Date.now()+'.png'),timeout:5000}); } catch {}
+};
+function evaluarCargaPagina(ms, e) { if(ms>8000) console.log('❌ PERFORMANCE FAILED: '+e+' tardó '+ms+'ms'); else if(ms>3000) console.log('⚠️ LENTO: '+e+' tardó '+ms+'ms'); else console.log('⏱ '+e+': '+ms+'ms'); }
+function evaluarAccion(ms, e) { if(ms>4000) console.log('❌ Acción lenta: '+e+' tardó '+ms+'ms'); else if(ms>1500) console.log('⚠️ Acción algo lenta: '+e+' tardó '+ms+'ms'); else console.log('⏱ '+e+': '+ms+'ms'); }
 
-  try {
-    await driver.get('https://dev.designsoftcr.com/qa_talleralpha/public/log/login');
-    await driver.findElement(By.id('email')).sendKeys('qadesignsoftcr@gmail.com');
-    await driver.findElement(By.id('password')).sendKeys('qa0000');
-    await driver.findElement(By.id('loginButton')).click();
-    await driver.wait(until.urlContains('dashboard'), 10000);
-
-    let url = await driver.getCurrentUrl();
-    if (url.includes('dashboard')) {
-      console.log('✅ CP-001 PASSED: Login exitoso, redirigió al dashboard correctamente');
-    } else {
-      console.log('❌ CP-001 FAILED: No redirigió al dashboard');
-    }
-  } catch (error) {
-    console.log('❌ CP-001 FAILED: ' + error.message);
-  } finally {
-    await driver.quit();
+async function navegarAModulo(browser, context, url) {
+  let page = await context.newPage();
+  await page.goto(url, { waitUntil: 'load', timeout: 180000 });
+  await page.waitForTimeout(3000);
+  if (/\/log\/login/i.test(page.url())) {
+    console.log('⚠️ Sesión expirada (redirect a /log/login) — regenerando y reintentando...');
+    await page.close();
+    fs.rmSync(SESION_PATH, { force: true });
+    const contextNuevo = await abrirContextoConSesion(browser);
+    page = await contextNuevo.newPage();
+    await page.goto(url, { waitUntil: 'load', timeout: 180000 });
+    await page.waitForTimeout(3000);
+    if (/\/log\/login/i.test(page.url())) throw new Error('Sigue redirigiendo a /log/login tras regenerar la sesión');
+    return { context: contextNuevo, page };
   }
+  return { context, page };
 }
 
-cp001_login_valido();
+async function cpNNN_nombre_descriptivo() {
+  console.log('🔄 Ejecutando CP-NNN: <descripción corta del caso>...');
+  const browser = await chromium.launch({ headless: false });
+  let context = await abrirContextoConSesion(browser);
+  let page;
+
+  try {
+    const t0 = Date.now();
+    ({ context, page } = await navegarAModulo(browser, context, URL_MODULO));
+    await page.waitForSelector('SELECTOR_DE_CARGA', { state: 'attached', timeout: 60000 });
+    evaluarCargaPagina(Date.now() - t0, 'Carga del módulo');
+
+    await refrescarConCacheLimpia(page);
+    await page.waitForSelector('SELECTOR_DE_CARGA', { state: 'attached', timeout: 60000 });
+
+    // ... lógica específica del caso (localizar elementos, interactuar) ...
+
+    // ── VALIDACIONES ──
+    const v1 = true; // reemplazar por la verificación real
+    console.log('\n📊 === VALIDACIONES CP-NNN ===');
+    console.log('  <validación 1>: ' + (v1 ? '✅' : '❌'));
+    if (!v1) throw new Error('<razón concreta del fallo>');
+
+    console.log('✅ CP-NNN PASSED | <resumen> | validaciones: 1/1');
+
+  } catch (error) {
+    await screenshotOnFail(page, 'cpNNN-fail');
+    console.log('❌ CP-NNN FAILED: ' + error.message);
+    process.exit(1);
+  } finally {
+    await browser.close();
+  }
+}
+cpNNN_nombre_descriptivo();
 ```
 
 ### Características del patrón
-- Uso de Selenium By para localizar elementos.
-- Uso de until para esperas explícitas.
-- Uso de console.log para trazabilidad.
-- Cierre del driver en finally.
-- Validación simple basada en URL o texto visible.
+- Sesión reutilizable (`abrirContextoConSesion`) en vez de login manual — estándar desde CP-128.
+- `refrescarConCacheLimpia(page)` después de cada navegación, antes de la lógica del caso.
+- `navegarAModulo` maneja sesión expirada (redirect a `/log/login`): regenera y reintenta una sola vez.
+- Uso de console.log con emojis para trazabilidad (🔄 inicio, 📊 validaciones, ✅/⚠️/❌ resultado).
+- Screenshot automático en fallo (`screenshotOnFail`) antes de salir con `process.exit(1)`.
+- Cierre del browser en `finally`.
+- Acciones que puedan disparar una llamada AJAX síncrona bloqueante del lado de la app se envuelven con un timeout explícito (`evaluateConTimeout`) — ver hallazgo y ejemplo real a continuación.
+
+### Hallazgo 2026-07-08 — timeout explícito para acciones de caja/pago (CP-107, CP-108)
+Durante la reorganización de carpetas se detectó que `tests-playwright/01-facturar/06-cierre-caja/cp108-cierre-movimientos-mixtos.js` se colgaba **indefinidamente** al clickear `btn_send_movement` (botón "Procesar" del modal de movimiento de caja). Investigado con un script de diagnóstico descartable (`page.on('dialog')` + `Promise.race` por paso): no era un diálogo nativo `alert()`/`confirm()` bloqueando Playwright — el `page.evaluate()` que dispara el click nunca resolvía ni rechazaba, consistente con que el handler de `btn_send_movement` en la app hace una llamada AJAX **síncrona** al servidor que nunca recibe respuesta (confirmado por errores `net::ERR_CONNECTION_CLOSED` en consola contra `dev.designsoftcr.com`, un problema del servidor compartido de QA, no del script ni de la reorganización).
+
+**Fix aplicado** (2026-07-08) en CP-107 y CP-108: se envolvió la acción de riesgo con un helper `evaluateConTimeout` que corre `page.evaluate()` contra un timeout explícito (25s) vía `Promise.race`, y si se cumple el timeout, lanza un error descriptivo en vez de dejar el proceso colgado:
+```javascript
+async function evaluateConTimeout(page, fn, timeoutMs, mensajeTimeout) {
+  const raced = await Promise.race([
+    page.evaluate(fn).then(resultado => ({ ok: true, resultado })),
+    new Promise(resolve => setTimeout(() => resolve({ ok: false }), timeoutMs))
+  ]);
+  if (!raced.ok) throw new Error(mensajeTimeout);
+  return raced.resultado;
+}
+```
+- **CP-108**: envuelve el click en `btn_send_movement` (registro de entrada/salida de caja) — mensaje: `"Timeout: el servidor no respondió al procesar movimiento de caja (posible ERR_CONNECTION_CLOSED) — btn_send_movement no completó en 25000ms"`.
+- **CP-107**: envuelve `start_open_cash()` (apertura de caja cuando estaba cerrada) con el mismo patrón, por el mismo tipo de riesgo (timing-race ya observado en CP-104, que usa un fallback similar).
+- Verificado tras el fix: CP-107 corrió y pasó normalmente (4/5, caja ya abierta — no ejerció la ruta de apertura). CP-108 falló en ~25s (antes se colgaba 5+ minutos) con el mensaje descriptivo esperado, confirmando que el fix cumple su objetivo: fallar rápido y claro en vez de colgarse. Nota: en este escenario específico (hilo de JS de la página bloqueado en segundo plano) el screenshot de fallo puede no capturarse — no afecta el objetivo principal del fix.
+- Este patrón (`evaluateConTimeout`) debe aplicarse a futuro en cualquier CP nuevo que dispare una acción de guardado/confirmación contra el servidor donde un cuelgue silencioso sea posible — ver plantilla del skill `crear-caso-prueba`.
 
 ---
 

@@ -6,6 +6,20 @@ const POS_URL = 'https://dev.designsoftcr.com/qa_talleralpha/public/pos/pointOfS
 const TOLERANCIA = 1;
 const MONTO_ENTRADA = 8000;
 const MONTO_SALIDA  = 2500;
+// Timeout explícito para acciones de caja que pueden disparar una llamada AJAX síncrona
+// del lado de la app (bloquea el hilo de JS de la página) — hallazgo CP-108 2026-07-08:
+// el click en btn_send_movement se colgó indefinidamente por ERR_CONNECTION_CLOSED contra
+// el servidor de QA. Sin este timeout, page.evaluate() nunca resuelve ni rechaza.
+const TIMEOUT_ACCION_CAJA_MS = 25000;
+
+async function evaluateConTimeout(page, fn, timeoutMs, mensajeTimeout) {
+  const raced = await Promise.race([
+    page.evaluate(fn).then(resultado => ({ ok: true, resultado })),
+    new Promise(resolve => setTimeout(() => resolve({ ok: false }), timeoutMs))
+  ]);
+  if (!raced.ok) throw new Error(mensajeTimeout);
+  return raced.resultado;
+}
 
 const screenshotOnFail = async (page, name) => {
   try { const dir = path.join(__dirname,'..','..','..','reports','screenshots'); fs.mkdirSync(dir,{recursive:true}); await page.screenshot({path:path.join(dir,name+'-'+Date.now()+'.png'),timeout:5000}); } catch {}
@@ -107,14 +121,15 @@ async function registrarMovimiento(page, tipo, monto, desc) {
   }, desc);
   await page.waitForTimeout(200);
 
-  // Procesar
+  // Procesar — con timeout explícito: el handler de btn_send_movement en la app puede
+  // hacer una llamada AJAX síncrona que se cuelga si el servidor de QA no responde.
   const tProc = Date.now();
-  const btnResult = await page.evaluate(() => {
+  const btnResult = await evaluateConTimeout(page, () => {
     const isVis = el => { const r = el.getBoundingClientRect(), s = window.getComputedStyle(el); return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none'; };
     const btn = document.getElementById('btn_send_movement');
     if (btn && isVis(btn)) { btn.click(); return true; }
     return false;
-  });
+  }, TIMEOUT_ACCION_CAJA_MS, 'Timeout: el servidor no respondió al procesar movimiento de caja (posible ERR_CONNECTION_CLOSED) — btn_send_movement no completó en ' + TIMEOUT_ACCION_CAJA_MS + 'ms');
   await page.waitForTimeout(3000);
   evaluarAccion(Date.now() - tProc, 'Procesar ' + tipo);
 

@@ -1,6 +1,6 @@
 ---
 name: crear-caso-prueba
-description: Genera un nuevo caso de prueba cpNNN-descripcion.js siguiendo el patrón estándar de la suite (login, navegación, validación, try/catch/finally). Usar cuando el usuario pida crear, agregar o automatizar un nuevo caso de prueba (CP) para TallerAlpha.
+description: Genera un nuevo caso de prueba cpNNN-descripcion.js con Playwright, sesión reutilizable y ubicado en su carpeta de módulo/submódulo correspondiente dentro de tests-playwright/. Usar cuando el usuario pida crear, agregar o automatizar un nuevo caso de prueba (CP) para TallerAlpha.
 ---
 
 # Crear caso de prueba
@@ -16,70 +16,121 @@ No usar este skill para modificar un CP ya existente y marcado como pasando (✅
 1. **Aclarar con el usuario** (si no vino ya especificado en el pedido):
    - Número de CP a usar (siguiente disponible en la tabla de README.md / CLAUDE_CONTEXT.md sección 5).
    - Descripción corta del flujo a probar.
+   - Módulo y submódulo real del sistema al que pertenece (ver tabla en README.md / CLAUDE_CONTEXT.md sección 2). Si el módulo/submódulo no tiene carpeta todavía, crearla siguiendo el patrón `NN-nombre-modulo/NN-nombre-submodulo` — ver sección 16 de CLAUDE_CONTEXT.md.
    - URL del módulo a probar (ver CLAUDE_CONTEXT.md sección 6 para URLs conocidas; si la pantalla es nueva, usar primero el skill `inspeccionar-modulo` para descubrir selectores).
    - Criterio de PASSED / FAILED.
 
-2. **Generar el archivo** `tests/cpNNN-descripcion.js` siguiendo el patrón estándar (snake_case en el nombre de función, async/await, try/catch/finally con `driver.quit()` en el finally):
+2. **Ubicar el archivo en la carpeta correcta**: `tests-playwright/<modulo>/<submodulo>/cpNNN-descripcion.js`. **Nunca** generar el archivo suelto en la raíz de `tests-playwright/` — es la regla vigente desde la reorganización del 2026-07-08 (CLAUDE_CONTEXT.md sección 16). Como el archivo queda 2 niveles por debajo de `tests-playwright/` (3 niveles por debajo de la raíz del repo), todas las rutas relativas usan **3** `../`, no 1.
+
+3. **Generar el archivo** siguiendo el patrón estándar Playwright (async/await, try/catch/finally con `browser.close()` en el finally, sesión reutilizable por defecto vía `auth/usar-sesion.js`, `refrescarConCacheLimpia` tras cada navegación):
 
 ```javascript
-const { Builder, By, until } = require('selenium-webdriver');
-const chrome = require('selenium-webdriver/chrome');
+const { chromium } = require('@playwright/test');
+const path = require('path');
+const fs = require('fs');
+const { abrirContextoConSesion, refrescarConCacheLimpia, SESION_PATH } = require('../../../auth/usar-sesion');
+
+const URL_MODULO = 'https://dev.designsoftcr.com/qa_talleralpha/public/URL_DEL_MODULO';
+
+const screenshotOnFail = async (page, name) => {
+  try { const dir = path.join(__dirname,'..','..','..','reports','screenshots'); fs.mkdirSync(dir,{recursive:true}); await page.screenshot({path:path.join(dir,name+'-'+Date.now()+'.png'),timeout:5000}); } catch {}
+};
+function evaluarCargaPagina(ms, e) { if(ms>8000) console.log('❌ PERFORMANCE FAILED: '+e+' tardó '+ms+'ms'); else if(ms>3000) console.log('⚠️ LENTO: '+e+' tardó '+ms+'ms'); else console.log('⏱ '+e+': '+ms+'ms'); }
+function evaluarAccion(ms, e) { if(ms>4000) console.log('❌ Acción lenta: '+e+' tardó '+ms+'ms'); else if(ms>1500) console.log('⚠️ Acción algo lenta: '+e+' tardó '+ms+'ms'); else console.log('⏱ '+e+': '+ms+'ms'); }
+
+async function navegarAModulo(browser, context, url) {
+  let page = await context.newPage();
+  await page.goto(url, { waitUntil: 'load', timeout: 180000 });
+  await page.waitForTimeout(3000);
+  if (/\/log\/login/i.test(page.url())) {
+    console.log('⚠️ Sesión expirada (redirect a /log/login) — regenerando y reintentando...');
+    await page.close();
+    fs.rmSync(SESION_PATH, { force: true });
+    const contextNuevo = await abrirContextoConSesion(browser);
+    page = await contextNuevo.newPage();
+    await page.goto(url, { waitUntil: 'load', timeout: 180000 });
+    await page.waitForTimeout(3000);
+    if (/\/log\/login/i.test(page.url())) throw new Error('Sigue redirigiendo a /log/login tras regenerar la sesión');
+    return { context: contextNuevo, page };
+  }
+  return { context, page };
+}
 
 async function cpNNN_nombre_descriptivo() {
   console.log('🔄 Ejecutando CP-NNN: <descripción corta del caso>...');
-
-  const options = new chrome.Options();
-  options.addArguments('--disable-notifications');
-  options.addArguments('--window-size=1440,1200');
-  const driver = await new Builder().forBrowser('chrome').setChromeOptions(options).build();
+  const browser = await chromium.launch({ headless: false });
+  let context = await abrirContextoConSesion(browser);
+  let page;
 
   try {
-    // Login
-    await driver.get('https://dev.designsoftcr.com/qa_talleralpha/public/log/login');
-    await driver.findElement(By.id('email')).sendKeys('qadesignsoftcr@gmail.com');
-    await driver.findElement(By.id('password')).sendKeys('qa0000');
-    await driver.findElement(By.id('loginButton')).click();
-    await driver.wait(until.urlContains('dashboard'), 20000);
+    const t0 = Date.now();
+    ({ context, page } = await navegarAModulo(browser, context, URL_MODULO));
+    // Esperar el selector que confirma que el módulo cargó (ajustar por módulo real):
+    await page.waitForSelector('SELECTOR_DE_CARGA', { state: 'attached', timeout: 60000 });
+    await page.waitForTimeout(2000);
+    evaluarCargaPagina(Date.now() - t0, 'Carga ' + 'NOMBRE_MODULO');
 
-    // Navegar al módulo correspondiente
-    await driver.get('URL_DEL_MODULO');
-    await driver.sleep(3000);
+    await refrescarConCacheLimpia(page);
+    await page.waitForSelector('SELECTOR_DE_CARGA', { state: 'attached', timeout: 60000 });
+    await page.waitForTimeout(2000);
 
     // ... lógica específica del caso (localizar elementos, interactuar) ...
 
-    // Validación y resultado
-    const condicionEsperada = true; // reemplazar por la verificación real
-    if (condicionEsperada) {
-      console.log('✅ CP-NNN PASSED: <razón por la que pasó>');
-    } else {
-      console.log('❌ CP-NNN FAILED: <razón por la que falló>');
-      process.exit(1);
-    }
+    // ── VALIDACIONES ──
+    const v1 = true; // reemplazar por la verificación real
+    console.log('\n📊 === VALIDACIONES CP-NNN ===');
+    console.log('  <descripción de la validación 1>: ' + (v1 ? '✅' : '❌'));
+
+    if (!v1) throw new Error('<razón concreta del fallo>');
+
+    console.log('✅ CP-NNN PASSED | <resumen de resultado> | validaciones: 1/1');
+
   } catch (error) {
+    await screenshotOnFail(page, 'cpNNN-fail');
     console.log('❌ CP-NNN FAILED: ' + error.message);
     process.exit(1);
   } finally {
-    await driver.quit();
+    await browser.close();
   }
 }
-
 cpNNN_nombre_descriptivo();
 ```
 
-3. **Ejecutar el caso individualmente** antes de darlo por terminado (regla obligatoria de CLAUDE.md):
+Notas sobre el patrón:
+- `abrirContextoConSesion(browser)` reutiliza la sesión de `auth/sesion-qa.json` si tiene menos de 2 horas, o la regenera automáticamente. Es el estándar por defecto para todo CP nuevo (vigente desde CP-128) — no implementar login manual (`#email`/`#password`/`#loginButton`) salvo pedido explícito del usuario para un caso legacy.
+- `refrescarConCacheLimpia(page)` limpia la caché de red vía CDP y recarga, evitando que HTML/JS cacheado de una corrida anterior interfiera con la siguiente. Se llama siempre después de `navegarAModulo` y antes de la lógica propia del caso.
+- `navegarAModulo` maneja el caso de sesión expirada (redirect a `/log/login`): borra `auth/sesion-qa.json`, regenera la sesión y reintenta una sola vez antes de fallar.
+- Si una acción del sistema puede disparar una llamada AJAX síncrona del lado de la app (por ejemplo, procesar un pago, cerrar caja, o cualquier "guardar"/"confirmar" contra el servidor), envolver ese `page.evaluate()` puntual con un timeout explícito en vez de dejarlo colgarse indefinidamente si el servidor no responde — ver el patrón `evaluateConTimeout` aplicado en CP-107/CP-108 (`tests-playwright/01-facturar/06-cierre-caja/`) como referencia:
+  ```javascript
+  async function evaluateConTimeout(page, fn, timeoutMs, mensajeTimeout) {
+    const raced = await Promise.race([
+      page.evaluate(fn).then(resultado => ({ ok: true, resultado })),
+      new Promise(resolve => setTimeout(() => resolve({ ok: false }), timeoutMs))
+    ]);
+    if (!raced.ok) throw new Error(mensajeTimeout);
+    return raced.resultado;
+  }
+  ```
+- Screenshot en fallo (`screenshotOnFail`) usa 3 `../` porque el archivo vive 2 niveles bajo `tests-playwright/`.
+- El caso **legacy** con login individual (`#email`/`#password`/`#loginButton`, sin sesión reutilizable) solo aplica a CP-001–CP-127, ya congelados — no es el patrón a replicar en CPs nuevos.
+
+4. **Ejecutar el caso individualmente** antes de darlo por terminado (regla obligatoria de CLAUDE.md):
 ```bash
-node tests/cpNNN-descripcion.js
+node tests-playwright/<modulo>/<submodulo>/cpNNN-descripcion.js
 ```
 Ajustar selectores/esperas si falla; no asumir que pasa sin haberlo corrido.
 
-4. **Actualizar la documentación** para que no quede desincronizada:
-   - Agregar la fila correspondiente en la tabla de `README.md` (sección "Casos de prueba implementados").
-   - Agregar la fila correspondiente en la tabla de `CLAUDE_CONTEXT.md` sección 5.
-   - No es necesario registrar el archivo en `runner.js`: descubre automáticamente cualquier `cpNNN-*.js`.
+5. **Actualizar la documentación** para que no quede desincronizada:
+   - Agregar la fila correspondiente en la tabla de `README.md` (sección "Casos de prueba implementados"), incluyendo la ruta completa con subcarpeta.
+   - Agregar la fila correspondiente en la tabla de `CLAUDE_CONTEXT.md` sección 5, con la ruta completa (`tests-playwright/modulo/submodulo/cpNNN-....js`).
+   - Si se creó una carpeta de módulo/submódulo nueva, agregarla también al árbol de la sección 2 y a la tabla del README.
+   - No es necesario registrar el archivo en ningún runner: no hay descubrimiento automático de CPs de Playwright en este proyecto — cada CP se ejecuta individualmente con `node <ruta>`.
 
 ## No hacer
 - No reescribir ni modificar un CP existente marcado ✅ en README.md sin confirmar primero con el usuario.
 - No introducir frameworks nuevos (Mocha/Jest/Page Objects) ni helpers que cambien el patrón estándar.
 - No hardcodear credenciales o URLs distintas a las fijas del entorno de QA.
-- No omitir el `try/catch/finally` con `driver.quit()` en el finally.
+- No omitir el `try/catch/finally` con `browser.close()` en el finally.
+- No generar el archivo suelto en la raíz de `tests-playwright/` — siempre en `modulo/submodulo/`.
+- No implementar login manual (patrón legacy) en un CP nuevo — usar `abrirContextoConSesion` salvo pedido explícito en contrario.
 - No dar el caso por terminado sin haberlo ejecutado al menos una vez.

@@ -4,6 +4,20 @@ const fs = require('fs');
 
 const POS_URL = 'https://dev.designsoftcr.com/qa_talleralpha/public/pos/pointOfSale?company_pos=20&pos_type_option=1';
 const TOLERANCIA = 1;
+// Timeout explícito para acciones de caja que pueden disparar una llamada AJAX síncrona
+// del lado de la app (bloquea el hilo de JS de la página) — mismo timing-race identificado
+// en CP-108 2026-07-08 (btn_send_movement colgado por ERR_CONNECTION_CLOSED contra el
+// servidor de QA). Sin este timeout, page.evaluate() nunca resuelve ni rechaza.
+const TIMEOUT_ACCION_CAJA_MS = 25000;
+
+async function evaluateConTimeout(page, fn, timeoutMs, mensajeTimeout) {
+  const raced = await Promise.race([
+    page.evaluate(fn).then(resultado => ({ ok: true, resultado })),
+    new Promise(resolve => setTimeout(() => resolve({ ok: false }), timeoutMs))
+  ]);
+  if (!raced.ok) throw new Error(mensajeTimeout);
+  return raced.resultado;
+}
 
 const screenshotOnFail = async (page, name) => {
   try { const dir = path.join(__dirname,'..','..','..','reports','screenshots'); fs.mkdirSync(dir,{recursive:true}); await page.screenshot({path:path.join(dir,name+'-'+Date.now()+'.png'),timeout:5000}); } catch {}
@@ -85,14 +99,14 @@ async function cp107_calculos_cierre_caja() {
     if (!esCierre) {
       // Caja cerrada → abrirla para poder leer el modal de cierre
       console.log('📌 Caja cerrada — abriendo para leer el modal de cierre...');
-      const aperturaResult = await page.evaluate(() => {
+      const aperturaResult = await evaluateConTimeout(page, () => {
         if (typeof start_open_cash === 'function') { start_open_cash(); return 'start_open_cash()'; }
         const isVis = el => { const r = el.getBoundingClientRect(), s = window.getComputedStyle(el); return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none'; };
         const btn = Array.from(document.querySelectorAll('button,a')).filter(isVis)
           .find(el => /abrir|iniciar|open|confirmar|aceptar/i.test(el.textContent||''));
         if (btn) { btn.click(); return 'btn: ' + btn.textContent.trim().substring(0,20); }
         return null;
-      });
+      }, TIMEOUT_ACCION_CAJA_MS, 'Timeout: el servidor no respondió al abrir la caja (posible ERR_CONNECTION_CLOSED) — start_open_cash() no completó en ' + TIMEOUT_ACCION_CAJA_MS + 'ms');
       await page.waitForTimeout(3000);
       for (let i = 0; i < 3; i++) { const a = await manejarAlerta(page); if (!a) break; await page.waitForTimeout(700); }
       console.log('✔ Apertura:', aperturaResult);
