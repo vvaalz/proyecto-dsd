@@ -22,7 +22,7 @@ async function confirmSweetAlerts(page, productPattern, maxRetries = 12) {
   return cartEmpty;
 }
 
-const screenshotOnFail = async (page, name) => { try { const dir=path.join(__dirname,'..','reports','screenshots'); fs.mkdirSync(dir,{recursive:true}); await page.screenshot({path:path.join(dir,name+'-'+Date.now()+'.png'),timeout:5000}); } catch {} };
+const screenshotOnFail = async (page, name) => { try { const dir=path.join(__dirname,'..','..','..','reports','screenshots'); fs.mkdirSync(dir,{recursive:true}); await page.screenshot({path:path.join(dir,name+'-'+Date.now()+'.png'),timeout:5000}); } catch {} };
 
 async function cp069_facturar_contingencia() {
   console.log('🔄 Ejecutando CP-069: Activar modo de contingencia y facturar...');

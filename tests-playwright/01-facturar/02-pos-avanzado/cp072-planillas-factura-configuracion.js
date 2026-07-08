@@ -4,7 +4,7 @@ const fs = require('fs');
 
 const SETTINGS_URL = 'https://dev.designsoftcr.com/qa_talleralpha/public/invoiceSetting/invoiceSetting';
 
-const screenshotOnFail = async (page, name) => { try { const dir=path.join(__dirname,'..','reports','screenshots'); fs.mkdirSync(dir,{recursive:true}); await page.screenshot({path:path.join(dir,name+'-'+Date.now()+'.png'),timeout:5000}); } catch {} };
+const screenshotOnFail = async (page, name) => { try { const dir=path.join(__dirname,'..','..','..','reports','screenshots'); fs.mkdirSync(dir,{recursive:true}); await page.screenshot({path:path.join(dir,name+'-'+Date.now()+'.png'),timeout:5000}); } catch {} };
 
 function evaluarCargaPagina(ms, etiqueta) {
   if (ms > 8000) { console.log('❌ PERFORMANCE FAILED (hallazgo, no corta la prueba): ' + etiqueta + ' tardó ' + ms + 'ms'); return false; }

@@ -112,7 +112,7 @@ async function cp060_toggle_impresion_facturar() {
 
     console.log('✅ CP-060 PASSED: Se deshabilitó/habilitó la impresión (F8) y se generaron facturas correctamente en ambos estados');
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp060-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-060 FAILED: ' + error.message);

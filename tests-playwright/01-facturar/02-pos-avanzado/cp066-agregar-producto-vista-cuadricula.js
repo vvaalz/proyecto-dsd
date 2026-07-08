@@ -50,7 +50,7 @@ async function cp066_agregar_producto_vista_cuadricula() {
       throw new Error('El producto no se reflejó en el carrito tras agregarlo desde la vista cuadrícula');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp066-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-066 FAILED: ' + error.message);

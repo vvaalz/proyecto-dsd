@@ -45,7 +45,7 @@ async function cp065_agregar_producto_vista_lista() {
       throw new Error('No se encontró ningún product_box en el catálogo en vista lista');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp065-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-065 FAILED: ' + error.message);

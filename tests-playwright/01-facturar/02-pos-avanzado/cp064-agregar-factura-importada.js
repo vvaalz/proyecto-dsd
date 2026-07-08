@@ -117,7 +117,7 @@ async function cp064_agregar_factura_importada() {
       throw new Error('La factura importada con productos agregados no se confirmó');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp064-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-064 FAILED: ' + error.message);

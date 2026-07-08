@@ -7,7 +7,7 @@ const TOLERANCIA = 1;
 const CLIENTE_ID = 12735;
 const CLIENTE_IDENTIFICACION = '119050235';
 
-const screenshotOnFail = async (page, name) => { try { const dir=path.join(__dirname,'..','reports','screenshots'); fs.mkdirSync(dir,{recursive:true}); await page.screenshot({path:path.join(dir,name+'-'+Date.now()+'.png'),timeout:5000}); } catch {} };
+const screenshotOnFail = async (page, name) => { try { const dir=path.join(__dirname,'..','..','..','reports','screenshots'); fs.mkdirSync(dir,{recursive:true}); await page.screenshot({path:path.join(dir,name+'-'+Date.now()+'.png'),timeout:5000}); } catch {} };
 
 async function cp071_exoneracion_hacienda() {
   console.log('🔄 Ejecutando CP-071: Aplicar exoneración y validar aceptación por Hacienda...');

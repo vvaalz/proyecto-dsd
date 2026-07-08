@@ -101,7 +101,7 @@ async function cp058_facturar_producto_gravado() {
       throw new Error('La factura no se confirmó (el producto sigue en el carrito)');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp058-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-058 FAILED: ' + error.message);

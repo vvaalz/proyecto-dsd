@@ -9,13 +9,13 @@ async function confirmSweetAlerts(page, productPattern, maxRetries = 12) {
   for (let i = 0; i < maxRetries && !cartEmpty; i++) {
     await page.waitForTimeout(1000);
     const state = await page.evaluate((pat) => {
-      const isVis=(el)=>{const r=el.getBoundingClientRect(),s=window.getComputedStyle(el);return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none';};
-      const sa=Array.from(document.querySelectorAll('.sweet-alert')).filter(isVis)[0];
-      const re=new RegExp(pat,'i');
-      return { hasSweetAlert:!!sa, cartHasProduct:re.test(document.getElementById('tb_table_buy_list').textContent) };
+      const isVis = (el) => { const r=el.getBoundingClientRect(),s=window.getComputedStyle(el); return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none'; };
+      const sa = Array.from(document.querySelectorAll('.sweet-alert')).filter(isVis)[0];
+      const re = new RegExp(pat, 'i');
+      return { hasSweetAlert: !!sa, cartHasProduct: re.test(document.getElementById('tb_table_buy_list').textContent) };
     }, productPattern);
     if (state.hasSweetAlert) {
-      await page.evaluate(()=>{
+      await page.evaluate(() => {
         const isVis=(el)=>{const r=el.getBoundingClientRect(),s=window.getComputedStyle(el);return r.width>0&&r.height>0;};
         const btn=Array.from(document.querySelectorAll('.sweet-alert button.confirm')).filter(isVis)[0];
         if(btn)btn.click();
@@ -26,8 +26,8 @@ async function confirmSweetAlerts(page, productPattern, maxRetries = 12) {
   return cartEmpty;
 }
 
-async function cp062_facturar_pago_unico() {
-  console.log('🔄 Ejecutando CP-062: Verificar facturación con un solo método de pago (tarjeta)...');
+async function cp061_facturar_pago_mixto() {
+  console.log('🔄 Ejecutando CP-061: Verificar facturación con múltiples métodos de pago (efectivo + tarjeta)...');
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1200 } });
   await context.clearCookies();
@@ -66,45 +66,46 @@ async function cp062_facturar_pago_unico() {
     await page.waitForTimeout(800);
 
     const totalToPay = await page.evaluate(() => {
+      const cash=document.getElementById('ck_is_payment_cash');
+      if(cash&&!cash.checked){cash.checked=true;cash.dispatchEvent(new Event('change',{bubbles:true}));}
+      const ef=document.getElementById('is_payment_cash');
+      if(ef&&!ef.checked){ef.checked=true;ef.dispatchEvent(new Event('change',{bubbles:true}));}
       const f=document.getElementById('payment_cash_total');
       return f?parseFloat(f.value||'0'):0;
     });
     if (!(totalToPay > 0)) throw new Error('No se pudo determinar el monto total a pagar');
-    console.log('💰 Monto total a pagar con tarjeta:', totalToPay);
+    console.log('💰 Monto total a distribuir:', totalToPay);
+
+    const half = Math.round((totalToPay / 2) * 100) / 100;
+    const remainder = Math.round((totalToPay - half) * 100) / 100;
 
     await page.evaluate(() => {
       const card=document.getElementById('is_payment_credit_card');
       if(card&&!card.checked){card.checked=true;card.dispatchEvent(new Event('change',{bubbles:true}));}
     });
     await page.waitForTimeout(500);
-    await page.evaluate(() => {
-      const cash=document.getElementById('ck_is_payment_cash');
-      if(cash&&cash.checked){cash.checked=false;cash.dispatchEvent(new Event('change',{bubbles:true}));}
-      const ef=document.getElementById('is_payment_cash');
-      if(ef&&ef.checked){ef.checked=false;ef.dispatchEvent(new Event('change',{bubbles:true}));}
-    });
-    await page.waitForTimeout(500);
 
-    await page.evaluate((total) => {
-      const el=document.getElementById('payment_credit_card_total');
-      if(el){el.value=total;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));}
-    }, totalToPay);
+    await page.evaluate(({ h, r }) => {
+      const setVal=(id,v)=>{const el=document.getElementById(id);if(!el)return;el.value=v;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));};
+      setVal('payment_cash_total', h);
+      setVal('payment_credit_card_total', r);
+    }, { h: half, r: remainder });
     await page.waitForTimeout(500);
 
     await page.evaluate(() => document.getElementById('make_payment').click());
     const cartEmpty = await confirmSweetAlerts(page, 'aaa-mult[ií]metro');
 
     if (cartEmpty) {
-      console.log('✅ CP-062 PASSED: Se facturó con un solo método de pago (tarjeta ₡' + totalToPay + ') y la venta se completó');
+      console.log('✅ CP-061 PASSED: Se facturó con pago mixto (efectivo ₡' + half + ' + tarjeta ₡' + remainder + ') y la venta se completó');
     } else {
-      throw new Error('La factura con pago único no se confirmó (el producto sigue en el carrito)');
+      throw new Error('La factura con pago mixto no se confirmó (el producto sigue en el carrito)');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
-    try { await page.screenshot({ path: path.join(dir, 'cp062-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
-    console.log('❌ CP-062 FAILED: ' + error.message);
+    try { await page.screenshot({ path: path.join(dir, 'cp061-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
+    console.log('❌ CP-061 FAILED: ' + error.message);
     process.exit(1);
   } finally { await browser.close(); }
 }
-cp062_facturar_pago_unico();
+cp061_facturar_pago_mixto();
