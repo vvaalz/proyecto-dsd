@@ -74,6 +74,8 @@ Nota: "01-facturar/09-ruteo-pos" (órdenes de ruteo creadas desde el POS) es un 
 
 "04-panel-control" (`/sett/setting`) está en construcción — de los ~26 CPs propuestos, por ahora solo está implementado el bloque de carga/navegación/hallazgos (CP-146–149); el bloque grande de las 19 secciones de configuración del acordeón y el tab Tienda online quedan pendientes (ver `CLAUDE_CONTEXT.md` sección 19).
 
+Nota sobre cobertura — sección "Consecutivos Comprobantes": esta sección del acordeón del Panel de Control es visible y clicable en el mismo ambiente QA de Costa Rica que usa toda la suite, pero al expandirla no renderiza ningún campo porque su contenido depende de un tenant de Honduras que no existe en este ambiente. Es un gap de cobertura real (no se puede ejercer ni validar esa funcionalidad puntual con los datos de QA disponibles), documentado en `CLAUDE_CONTEXT.md` sección 19 — distinto de las funcionalidades exclusivas de Costa Rica (Hacienda, Factura Electrónica CR, exoneraciones, etc.), que sí están correctamente cubiertas porque el ambiente QA es costarricense y esas SÍ son el alcance esperado del proyecto.
+
 ## Autenticación en las pruebas
 
 - **CP-001 a CP-127**: login individual completo en cada script (llenar `#email`/`#password`, click en `#loginButton`, esperar `**/dashboard**`). Es el patrón "legacy" — no se toca, ya está probado y funcionando.
