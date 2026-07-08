@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "core-util-is": "^1.0.3",
+    "dotenv": "^17.4.2",
     "immediate": "^3.0.6",
     "inherits": "^2.0.4",
     "isarray": "^1.0.0",

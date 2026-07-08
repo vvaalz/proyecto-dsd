@@ -10,5 +10,13 @@ node_modules/
 # Screenshots de fallo generados durante las pruebas
 reports/screenshots/
 
+# Historial acumulado de tiempos de ejecución y su reporte HTML (locales/regenerables,
+# ver utils/registrar-tiempo.js y utils/generar-reporte-tiempos.js)
+reports/tiempos-ejecucion.json
+reports/reporte-tiempos.html
+
 # Sesión de storageState (contiene tokens de sesión activos, NUNCA subir a GitHub)
 auth/sesion-qa.json
+
+# Variables de entorno (credenciales reales, NUNCA subir a GitHub — usar .env.example como plantilla)
+.env

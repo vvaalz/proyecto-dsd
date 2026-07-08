@@ -29,8 +29,10 @@ const { chromium } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
 const { abrirContextoConSesion, refrescarConCacheLimpia, SESION_PATH } = require('../../../auth/usar-sesion');
+const { BASE_URL } = require('../../../config');
+const { registrarResultado, moduloDesdeRuta } = require('../../../utils/registrar-tiempo');
 
-const URL_MODULO = 'https://dev.designsoftcr.com/qa_talleralpha/public/URL_DEL_MODULO';
+const URL_MODULO = `${BASE_URL}/URL_DEL_MODULO`;
 
 const screenshotOnFail = async (page, name) => {
   try { const dir = path.join(__dirname,'..','..','..','reports','screenshots'); fs.mkdirSync(dir,{recursive:true}); await page.screenshot({path:path.join(dir,name+'-'+Date.now()+'.png'),timeout:5000}); } catch {}
@@ -61,6 +63,7 @@ async function cpNNN_nombre_descriptivo() {
   const browser = await chromium.launch({ headless: false });
   let context = await abrirContextoConSesion(browser);
   let page;
+  const tiempoInicioCP = Date.now();
 
   try {
     const t0 = Date.now();
@@ -84,10 +87,12 @@ async function cpNNN_nombre_descriptivo() {
     if (!v1) throw new Error('<razón concreta del fallo>');
 
     console.log('✅ CP-NNN PASSED | <resumen de resultado> | validaciones: 1/1');
+    registrarResultado({ cp: 'CP-NNN', modulo: moduloDesdeRuta(__dirname), estado: 'pass', tiempoMs: Date.now() - tiempoInicioCP });
 
   } catch (error) {
     await screenshotOnFail(page, 'cpNNN-fail');
     console.log('❌ CP-NNN FAILED: ' + error.message);
+    registrarResultado({ cp: 'CP-NNN', modulo: moduloDesdeRuta(__dirname), estado: 'fail', tiempoMs: Date.now() - tiempoInicioCP });
     process.exit(1);
   } finally {
     await browser.close();
@@ -100,6 +105,8 @@ Notas sobre el patrón:
 - `abrirContextoConSesion(browser)` reutiliza la sesión de `auth/sesion-qa.json` si tiene menos de 2 horas, o la regenera automáticamente. Es el estándar por defecto para todo CP nuevo (vigente desde CP-128) — no implementar login manual (`#email`/`#password`/`#loginButton`) salvo pedido explícito del usuario para un caso legacy.
 - `refrescarConCacheLimpia(page)` limpia la caché de red vía CDP y recarga, evitando que HTML/JS cacheado de una corrida anterior interfiera con la siguiente. Se llama siempre después de `navegarAModulo` y antes de la lógica propia del caso.
 - `navegarAModulo` maneja el caso de sesión expirada (redirect a `/log/login`): borra `auth/sesion-qa.json`, regenera la sesión y reintenta una sola vez antes de fallar.
+- `require('../../../config')` (`BASE_URL`, y también `LOGIN_URL`/`DASHBOARD_URL`/`EMAIL`/`PASSWORD` si el caso los necesita) — **estándar desde 2026-07-08**: ningún CP nuevo debe hardcodear la URL base ni credenciales; siempre se importan de `config.js` (que a su vez lee `.env`, ver README "Variables de entorno"). Ajustar el número de `../` según la profundidad real de la carpeta del CP.
+- `registrarResultado({ cp, modulo, estado, tiempoMs })` (`utils/registrar-tiempo.js`) — **estándar desde 2026-07-08 para CPs nuevos (CP-146 en adelante)**: se llama una vez al final de cada corrida, tanto en el camino de éxito como en el catch de fallo, con el tiempo total transcurrido desde el inicio del CP. Alimenta `reports/tiempos-ejecucion.json`, que se puede convertir en un reporte HTML con `node utils/generar-reporte-tiempos.js`. `moduloDesdeRuta(__dirname)` deriva el módulo/submódulo automáticamente de la ubicación del archivo — no hace falta escribirlo a mano.
 - Si una acción del sistema puede disparar una llamada AJAX síncrona del lado de la app (por ejemplo, procesar un pago, cerrar caja, o cualquier "guardar"/"confirmar" contra el servidor), envolver ese `page.evaluate()` puntual con un timeout explícito en vez de dejarlo colgarse indefinidamente si el servidor no responde — ver el patrón `evaluateConTimeout` aplicado en CP-107/CP-108 (`tests-playwright/01-facturar/06-cierre-caja/`) como referencia:
   ```javascript
   async function evaluateConTimeout(page, fn, timeoutMs, mensajeTimeout) {
@@ -112,7 +119,7 @@ Notas sobre el patrón:
   }
   ```
 - Screenshot en fallo (`screenshotOnFail`) usa 3 `../` porque el archivo vive 2 niveles bajo `tests-playwright/`.
-- El caso **legacy** con login individual (`#email`/`#password`/`#loginButton`, sin sesión reutilizable) solo aplica a CP-001–CP-127, ya congelados — no es el patrón a replicar en CPs nuevos.
+- El caso **legacy** con login individual (`#email`/`#password`/`#loginButton`, sin sesión reutilizable, sin config.js, sin registrarResultado) solo aplica a CP-001–CP-127, ya congelados — no es el patrón a replicar en CPs nuevos.
 
 4. **Ejecutar el caso individualmente** antes de darlo por terminado (regla obligatoria de CLAUDE.md):
 ```bash
@@ -129,8 +136,9 @@ Ajustar selectores/esperas si falla; no asumir que pasa sin haberlo corrido.
 ## No hacer
 - No reescribir ni modificar un CP existente marcado ✅ en README.md sin confirmar primero con el usuario.
 - No introducir frameworks nuevos (Mocha/Jest/Page Objects) ni helpers que cambien el patrón estándar.
-- No hardcodear credenciales o URLs distintas a las fijas del entorno de QA.
+- No hardcodear credenciales o URLs — siempre importarlas de `config.js` (que lee `.env`), nunca escribir el dominio/usuario/password literal en un CP nuevo.
 - No omitir el `try/catch/finally` con `browser.close()` en el finally.
 - No generar el archivo suelto en la raíz de `tests-playwright/` — siempre en `modulo/submodulo/`.
 - No implementar login manual (patrón legacy) en un CP nuevo — usar `abrirContextoConSesion` salvo pedido explícito en contrario.
+- No omitir la llamada a `registrarResultado()` (éxito y fallo) en un CP nuevo — es lo que alimenta el reporte de tiempos de ejecución.
 - No dar el caso por terminado sin haberlo ejecutado al menos una vez.

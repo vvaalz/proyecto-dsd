@@ -20,6 +20,17 @@ Suite de pruebas automatizadas desarrollada en JavaScript con Selenium WebDriver
 2. Clonar o descargar el proyecto
 3. Abrir la terminal en la carpeta del proyecto
 4. Ejecutar: npm install
+5. Copiar `.env.example` a `.env` y completar los valores reales:
+   ```bash
+   cp .env.example .env
+   ```
+   Editar `.env` con la URL base y credenciales del entorno de QA:
+   ```
+   QA_BASE_URL=https://dev.designsoftcr.com/qa_talleralpha/public
+   QA_EMAIL=qadesignsoftcr@gmail.com
+   QA_PASSWORD=qa0000
+   ```
+   `.env` está en `.gitignore` — nunca se sube a GitHub porque contiene credenciales reales. `config.js` en la raíz lee estas variables (vía `dotenv`) y expone `BASE_URL`, `LOGIN_URL`, `DASHBOARD_URL`, `EMAIL` y `PASSWORD` para que `auth/generar-sesion.js`, `auth/test-sesion.js` y cualquier CP nuevo las importen en vez de hardcodearlas. **CP-001 a CP-127 no usan `config.js`** — siguen con sus credenciales hardcodeadas como patrón legacy, no se tocan.
 
 ## Cómo ejecutar las pruebas
 
@@ -87,6 +98,24 @@ Nota: "01-facturar/09-ruteo-pos" (órdenes de ruteo creadas desde el POS) es un 
     // ... lógica del CP ...
     ```
   - Mismo criterio aplica a las rutas de screenshots en fallo (`path.join(__dirname, '..', '..', '..', 'reports', 'screenshots')`, 3 niveles en vez de 1) — ver el patrón completo en cualquier CP existente dentro de `tests-playwright/`.
+
+## Reporte de tiempos de ejecución
+
+Desde el 2026-07-08, todo CP nuevo (CP-146 en adelante) registra su tiempo total de ejecución vía `utils/registrar-tiempo.js`:
+- `registrarResultado({ cp, modulo, estado, tiempoMs })` se llama una vez al final de cada CP (tanto en el camino de éxito como en el catch de fallo) y agrega una línea a `reports/tiempos-ejecucion.json` (número de CP, módulo/submódulo, estado `pass`/`fail`, tiempo en ms y timestamp).
+- `moduloDesdeRuta(__dirname)`, exportado desde el mismo archivo, deriva el módulo/submódulo automáticamente a partir de la ubicación del CP — no hace falta escribirlo a mano.
+- **CP-001 a CP-145 no llaman a `registrarResultado()`** — no se modificaron para no tocar CPs ya congelados; el reporte solo cubre CPs nuevos de aquí en adelante.
+
+Para generar el reporte HTML a partir del historial acumulado:
+```bash
+node utils/generar-reporte-tiempos.js
+```
+Esto lee `reports/tiempos-ejecucion.json` y genera `reports/reporte-tiempos.html` con:
+- Los 10 CPs más lentos, destacados.
+- Promedio de tiempo por módulo/submódulo.
+- Tabla completa de todos los CPs registrados, con badge ✅/⚠️/❌ según los mismos umbrales ya usados en el proyecto (`evaluarCargaPagina`/`evaluarAccion`: ⚠️ &gt; 3000ms, ❌ &gt; 8000ms, aplicados aquí al tiempo total del CP).
+
+`reports/tiempos-ejecucion.json` y `reports/reporte-tiempos.html` están en `.gitignore` (son datos locales/regenerables de cada máquina, igual que `reports/screenshots/`).
 
 ## Casos de prueba implementados
 

@@ -370,39 +370,51 @@ La suite en el repositorio contiene actualmente los CP-001 a CP-145, organizados
 
 ## 6. URL base del sistema bajo prueba
 
+**Actualizado 2026-07-08**: la URL base y las credenciales ahora viven en `.env` (no versionado) y se acceden vía `config.js` en la raíz del proyecto — ver sección 17 "Variables de entorno y config.js". `config.js` expone `BASE_URL`, `LOGIN_URL` y `DASHBOARD_URL` ya armadas.
+
 URL base principal:
-- https://dev.designsoftcr.com/qa_talleralpha/public/
+- https://dev.designsoftcr.com/qa_talleralpha/public/ (= `config.BASE_URL`)
 
 URLs frecuentes usadas en los scripts:
-- Login: https://dev.designsoftcr.com/qa_talleralpha/public/log/login
-- Dashboard: https://dev.designsoftcr.com/qa_talleralpha/public/dashboard
+- Login: https://dev.designsoftcr.com/qa_talleralpha/public/log/login (= `config.LOGIN_URL`)
+- Dashboard real tras login: https://dev.designsoftcr.com/qa_talleralpha/public/dash/dashboard (= `config.DASHBOARD_URL` — **no** `/public/dashboard`, ese path da 404, ver hallazgo de `auth/test-sesion.js`)
 - Recepción: https://dev.designsoftcr.com/qa_talleralpha/public/vehicularReception/vehicularQuickReception
 - Tablero: https://dev.designsoftcr.com/qa_talleralpha/public/vehicularReception/workOrderBoard
 - Reportes: https://dev.designsoftcr.com/qa_talleralpha/public/reports/order_report
+
+CP-001 a CP-127 siguen con estas URLs hardcodeadas (patrón legacy, no se tocan). CP-128 en adelante que usan `auth/` ya obtienen la URL de sesión indirectamente; CP-146 en adelante deben construir cualquier URL de módulo a partir de `config.BASE_URL` en vez de hardcodear el dominio.
 
 ---
 
 ## 7. Credenciales de prueba usadas
 
+**Actualizado 2026-07-08**: estas credenciales viven en `.env` (`QA_EMAIL`/`QA_PASSWORD`, no versionado) y se acceden vía `config.EMAIL`/`config.PASSWORD` — ver sección 17.
+
 Usuario de QA utilizado en los scripts:
 - Usuario: qadesignsoftcr@gmail.com
 - Contraseña: qa0000
 
-Estas credenciales aparecen en múltiples casos de login y navegación.
+Estas credenciales aparecen hardcodeadas en CP-001 a CP-127 (patrón legacy, no se tocan) y en `auth/generar-sesion.js` antes del 2026-07-08 (ahora importadas de `config.js`). Todo CP nuevo debe importarlas de `config.js`, nunca escribirlas literalmente.
 
 ---
 
 ## 8. Dependencias del proyecto
 
-Dependencia declarada en el proyecto:
-- selenium-webdriver ^4.45.0
+**Actualizado 2026-07-08.**
+
+Dependencias declaradas en el proyecto:
+- `selenium-webdriver` ^4.45.0 (suite histórica en `tests/selenium-backup/`, ya no se ejecuta)
+- `@playwright/test` ^1.61.1 (suite activa en `tests-playwright/`)
+- `dotenv` (carga `.env` para `config.js` — agregado 2026-07-08)
 
 Instalación:
 ```bash
 npm install
 ```
 
-El archivo package-lock.json está presente y registra la dependencia exacta instalada.
+Tras instalar, copiar `.env.example` a `.env` y completar las variables reales (ver sección 17) antes de correr cualquier CP que use `config.js` o `auth/`.
+
+El archivo package-lock.json está presente y registra las dependencias exactas instaladas.
 
 ---
 
@@ -604,3 +616,71 @@ Consecuencias prácticas de la profundidad de carpetas (2 niveles bajo `tests-pl
 - `require('../../../auth/usar-sesion')` (3 `../`, no 1) para los CPs que usan sesión reutilizable (ver "Autenticación en las pruebas" del README).
 - `path.join(__dirname, '..', '..', '..', 'reports', 'screenshots')` (3 `../`, no 1) para el patrón `screenshotOnFail` estándar de la suite.
 - El skill `crear-caso-prueba` debe generar el archivo ya en la ruta anidada correcta, no en la raíz de `tests-playwright/` para luego moverlo.
+
+---
+
+## 17. Variables de entorno y config.js
+
+**Agregado 2026-07-08.** La URL base y las credenciales de QA dejaron de estar hardcodeadas en `auth/` y ahora se centralizan en variables de entorno.
+
+### Archivos involucrados
+- **`.env`** (raíz del proyecto, **no versionado** — está en `.gitignore`): contiene los valores reales.
+  ```
+  QA_BASE_URL=https://dev.designsoftcr.com/qa_talleralpha/public
+  QA_EMAIL=qadesignsoftcr@gmail.com
+  QA_PASSWORD=qa0000
+  ```
+- **`.env.example`** (raíz, sí versionado): misma estructura con placeholders, documenta qué variables hacen falta sin exponer credenciales reales. Copiar a `.env` y completar antes de correr cualquier CP que dependa de `config.js` (ver README sección "Instalación").
+- **`config.js`** (raíz): carga `dotenv` y exporta las constantes ya armadas:
+  ```javascript
+  require('dotenv').config();
+  module.exports = {
+    BASE_URL: process.env.QA_BASE_URL,
+    LOGIN_URL: `${process.env.QA_BASE_URL}/log/login`,
+    DASHBOARD_URL: `${process.env.QA_BASE_URL}/dash/dashboard`,
+    EMAIL: process.env.QA_EMAIL,
+    PASSWORD: process.env.QA_PASSWORD,
+  };
+  ```
+
+### Qué se migró y qué NO
+- `auth/generar-sesion.js` ahora importa `LOGIN_URL`, `EMAIL`, `PASSWORD` de `../config` en vez de tenerlos hardcodeados.
+- `auth/test-sesion.js` ahora importa `DASHBOARD_URL` de `../config` en vez de tenerlo hardcodeado.
+- `auth/usar-sesion.js` no tenía URLs/credenciales hardcodeadas (solo maneja `storageState` y CDP) — no requirió cambios.
+- **CP-001 a CP-127 NO se tocaron** — siguen con sus credenciales/URLs hardcodeadas como patrón legacy, funcionando igual que antes. Esta migración aplica solo a la infraestructura compartida (`auth/`) y a los CPs nuevos de aquí en adelante.
+- Verificado tras la migración: `node auth/generar-sesion.js`, `node auth/test-sesion.js` y un CP existente que usa `abrirContextoConSesion` (CP-128) corrieron sin cambios de comportamiento.
+
+### Regla para CPs nuevos
+Todo CP nuevo debe importar sus URLs y credenciales desde `config.js` (ajustando el número de `../` según la profundidad de la carpeta — 3 niveles para un CP en `tests-playwright/modulo/submodulo/`), **nunca hardcodearlas de nuevo**:
+```javascript
+const { BASE_URL } = require('../../../config');
+const URL_MODULO = `${BASE_URL}/ruta/del/modulo`;
+```
+
+---
+
+## 18. Reporte de tiempos de ejecución
+
+**Agregado 2026-07-08.** Sistema para registrar y reportar cuánto tarda cada CP, pensado para CPs nuevos (CP-146 en adelante) — no se aplicó retroactivamente a CP-001–145 para no tocar CPs ya congelados.
+
+### `utils/registrar-tiempo.js`
+Exporta:
+- `registrarResultado({ cp, modulo, estado, tiempoMs })`: agrega una entrada a `reports/tiempos-ejecucion.json` (array acumulado) con `cp`, `modulo`, `estado` (`'pass'`|`'fail'`), `tiempoMs` y un `timestamp` ISO generado automáticamente. Se llama una vez al final de cada CP, tanto en el camino de éxito (antes del `console.log('✅ ... PASSED')`) como en el `catch` de fallo (antes del `process.exit(1)`).
+- `moduloDesdeRuta(dirname)`: deriva el string de módulo/submódulo (ej. `"01-facturar/09-ruteo-pos"`) a partir de `__dirname`, buscando el segmento `tests-playwright` en la ruta y tomando los 2 siguientes. Se le pasa `__dirname` del CP que llama, no hace falta escribir el módulo a mano.
+- `RUTA_JSON`: ruta absoluta a `reports/tiempos-ejecucion.json`, por si algún script necesita leerlo directamente.
+
+### `utils/generar-reporte-tiempos.js`
+Script standalone (`node utils/generar-reporte-tiempos.js`) que lee `reports/tiempos-ejecucion.json` y genera `reports/reporte-tiempos.html` con:
+- Resumen (total de registros, pasaron/fallaron, tiempo promedio general).
+- Top 10 CPs más lentos, destacados con fondo amarillo.
+- Promedio de tiempo por módulo/submódulo.
+- Tabla completa de todos los CPs registrados, con badge ✅/⚠️/❌ por fila.
+
+Umbrales de clasificación reutilizados del proyecto (`evaluarCargaPagina`/`evaluarAccion`), aplicados aquí al tiempo TOTAL del CP (no hay desglose por acción en el JSON acumulado): ✅ si `tiempoMs ≤ 3000`, ⚠️ si `> 3000`, ❌ si `> 8000`.
+
+Si `reports/tiempos-ejecucion.json` no existe todavía (ningún CP nuevo corrió aún), el script lo indica por consola y no genera el HTML.
+
+### Notas
+- `reports/tiempos-ejecucion.json` y `reports/reporte-tiempos.html` están en `.gitignore` — son datos locales/regenerables de cada máquina, igual que `reports/screenshots/`, no se versionan.
+- No hay lock/mutex contra escrituras concurrentes — asumido seguro porque los CPs de este proyecto se corren de a uno por vez (`node <ruta>`), nunca en paralelo real.
+- Ver la plantilla actualizada del skill `crear-caso-prueba` para el patrón exacto de integración (dónde va la llamada, cómo se captura `tiempoInicioCP`).

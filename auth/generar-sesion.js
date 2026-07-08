@@ -1,5 +1,6 @@
 const { chromium } = require('@playwright/test');
 const path = require('path');
+const { LOGIN_URL, EMAIL, PASSWORD } = require('../config');
 
 const SESION_PATH = path.join(__dirname, 'sesion-qa.json');
 
@@ -10,11 +11,10 @@ async function generarSesion() {
   });
   const page = await context.newPage();
 
-  await page.goto('https://dev.designsoftcr.com/qa_talleralpha/public/log/login',
-    { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.goto(LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-  await page.fill('#email', 'qadesignsoftcr@gmail.com');
-  await page.fill('#password', 'qa0000');
+  await page.fill('#email', EMAIL);
+  await page.fill('#password', PASSWORD);
   await page.click('#loginButton');
   await page.waitForURL('**/dashboard**', { timeout: 40000 });
 

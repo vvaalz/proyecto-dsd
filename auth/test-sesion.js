@@ -1,10 +1,10 @@
 const { chromium } = require('@playwright/test');
 const fs = require('fs');
 const { abrirContextoConSesion, SESION_PATH } = require('./usar-sesion');
+const { DASHBOARD_URL } = require('../config');
 
 // Nota: la URL real tras login es /public/dash/dashboard (no /public/dashboard,
 // ese path da 404 — confirmado navegando manualmente tras un login fresco)
-const DASHBOARD_URL = 'https://dev.designsoftcr.com/qa_talleralpha/public/dash/dashboard';
 
 async function navegarADashboard(browser) {
   const context = await abrirContextoConSesion(browser);
