@@ -47,7 +47,7 @@ async function cp013_buscar_orden_por_nombre_cliente() {
       throw new Error('La búsqueda por nombre de cliente no mostró resultados visibles');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp013-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-013 FAILED: ' + error.message);

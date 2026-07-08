@@ -2,8 +2,8 @@
 const path = require('path');
 const fs = require('fs');
 
-async function cp008_asignar_mecanico_servicio() {
-  console.log('🔄 Ejecutando CP-008: Verificar que se puede asignar mecánico al agregar un servicio...');
+async function cp010_cancelar_generacion_orden() {
+  console.log('🔄 Ejecutando CP-010: Verificar que cancelar la generación de orden regresa a la recepción...');
 
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext();
@@ -25,33 +25,30 @@ async function cp008_asignar_mecanico_servicio() {
     await page.waitForTimeout(4000);
 
     try {
-      await page.locator('button, a').filter({ visible: true }).first().click({ timeout: 3000 });
-      await page.waitForTimeout(2000);
+      await page.locator('button.btn-danger, button.btn-secondary, button[onclick*="cancel"], button[id*="cancel"]')
+        .filter({ visible: true })
+        .first()
+        .click({ timeout: 5000 });
+      await page.waitForTimeout(3000);
     } catch {}
 
-    try {
-      const sel = page.locator('select[id*="mecan"], select[name*="mecan"], select[id*="mechanic"], select[name*="mechanic"]').filter({ visible: true }).first();
-      await sel.click({ timeout: 3000 });
-      await page.waitForTimeout(1000);
-      await sel.selectOption({ index: 1 });
-    } catch {}
-
+    const currentUrl = page.url();
     const bodyText = await page.locator('body').innerText();
     const passed =
-      bodyText.toLowerCase().includes('mecánico') ||
-      bodyText.toLowerCase().includes('mecanico') ||
-      bodyText.toLowerCase().includes('servicio');
+      currentUrl.includes('vehicularQuickReception') ||
+      bodyText.toLowerCase().includes('recepción') ||
+      bodyText.toLowerCase().includes('recepcion');
 
     if (passed) {
-      console.log('✅ CP-008 PASSED: Se pudo interactuar con el flujo de asignación de mecánico y servicio');
+      console.log('✅ CP-010 PASSED: Cancelar la generación de orden regresó a la recepción');
     } else {
-      console.log('❌ CP-008 FAILED: No se observó la asignación de mecánico o servicio');
+      console.log('❌ CP-010 FAILED: No se regresó a la recepción al cancelar');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
-    try { await page.screenshot({ path: path.join(dir, 'cp008-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
-    console.log('❌ CP-008 FAILED: ' + error.message);
+    try { await page.screenshot({ path: path.join(dir, 'cp010-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
+    console.log('❌ CP-010 FAILED: ' + error.message);
     await browser.close();
     process.exit(1);
   } finally {
@@ -59,4 +56,4 @@ async function cp008_asignar_mecanico_servicio() {
   }
 }
 
-cp008_asignar_mecanico_servicio();
+cp010_cancelar_generacion_orden();

@@ -43,7 +43,7 @@ async function cp006_acceso_recepcion_vehiculo() {
       throw new Error('No se pudo acceder al módulo de Recepción de Vehículo');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     await page.screenshot({ path: path.join(dir, `cp006-fallo-${Date.now()}.png`) });
     console.log('❌ CP-006 FAILED: ' + error.message);

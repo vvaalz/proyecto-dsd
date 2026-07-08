@@ -51,7 +51,7 @@ async function cp014_cambiar_vista_lista_caja() {
       throw new Error('No se encontró un control de cambio de vista');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp014-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-014 FAILED: ' + error.message);

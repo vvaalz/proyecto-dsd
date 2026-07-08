@@ -48,7 +48,7 @@ async function cp015_cambiar_sucursal_selector() {
       throw new Error('El cambio de sucursal no produjo una actualización visible');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp015-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-015 FAILED: ' + error.message);

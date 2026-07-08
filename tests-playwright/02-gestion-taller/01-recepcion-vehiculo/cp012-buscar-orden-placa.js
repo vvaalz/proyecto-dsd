@@ -51,7 +51,7 @@ async function cp012_buscar_orden_por_placa() {
       throw new Error('La búsqueda por placa no mostró resultados visibles (bodyText=' + bodyText.substring(0, 100) + ')');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp012-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-012 FAILED: ' + error.message);

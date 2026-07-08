@@ -44,7 +44,7 @@ async function cp009_modal_confirmacion_guardar() {
       console.log('⚠️ CP-009 RESULT: El flujo de guardar se abrió, pero no se observó el mensaje de confirmación en esta sesión');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp009-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-009 FAILED: ' + error.message);

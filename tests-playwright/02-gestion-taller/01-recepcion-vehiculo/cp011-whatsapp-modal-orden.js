@@ -54,7 +54,7 @@ async function cp011_whatsapp_modal_orden() {
       throw new Error('No se detectó el modal de WhatsApp tras la generación de la orden');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp011-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-011 FAILED: ' + error.message);
