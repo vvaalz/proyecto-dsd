@@ -36,7 +36,7 @@ async function cp017_tablero_carga_columnas() {
       console.log('❌ CP-017b FAILED: El tablero no cargó como se esperaba');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     await page.screenshot({ path: path.join(dir, 'cp017b-fallo-' + Date.now() + '.png') });
     console.log('❌ CP-017b FAILED: ' + error.message);

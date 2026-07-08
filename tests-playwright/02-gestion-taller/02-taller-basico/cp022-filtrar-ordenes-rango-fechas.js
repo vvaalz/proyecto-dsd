@@ -47,7 +47,7 @@ async function cp022_filtrar_ordenes_rango_fechas() {
       console.log('⚠️ CP-022 RESULT: No se encontraron campos de fecha para filtrar (count=' + count + ')');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp022-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-022 FAILED: ' + error.message);

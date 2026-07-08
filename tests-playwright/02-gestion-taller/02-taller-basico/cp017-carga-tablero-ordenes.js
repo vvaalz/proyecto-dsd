@@ -38,7 +38,7 @@ async function cp017_carga_tablero_ordenes() {
       throw new Error('El tablero no cargó como se esperaba (visible=' + visible + ', placeholder=' + placeholder + ')');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp017-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-017 FAILED: ' + error.message);

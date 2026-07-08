@@ -42,7 +42,7 @@ async function cp025_agregar_abono_orden() {
       console.log('⚠️ CP-025 RESULT: No se encontró un control claro para agregar abono');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp025-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-025 FAILED: ' + error.message);

@@ -43,7 +43,7 @@ async function cp024_detalle_orden_muestra_informacion() {
       console.log('⚠️ CP-024 RESULT: No se encontró una tabla de órdenes para abrir detalle');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp024-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-024 FAILED: ' + error.message);

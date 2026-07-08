@@ -45,7 +45,7 @@ async function cp023_descarga_reporte_excel() {
       console.log('⚠️ CP-023 RESULT: No se encontró un botón de descarga explícito');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp023-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-023 FAILED: ' + error.message);

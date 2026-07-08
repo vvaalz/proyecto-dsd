@@ -50,7 +50,7 @@ async function cp019_crear_seccion_tablero() {
       console.log('⚠️ CP-019 RESULT: El tablero cargó, pero el valor del campo no se reflejó en esta ejecución (name=' + result.nameValue + ', color=' + result.colorValue + ')');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp019-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-019 FAILED: ' + error.message);

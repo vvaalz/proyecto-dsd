@@ -38,7 +38,7 @@ async function cp021_carga_modulo_reporte_ordenes() {
       throw new Error('El módulo no cargó como se esperaba (url=' + currentUrl + ')');
     }
   } catch (error) {
-    const dir = path.join(__dirname, '..', 'reports', 'screenshots');
+    const dir = path.join(__dirname, '..', '..', '..', 'reports', 'screenshots');
     fs.mkdirSync(dir, { recursive: true });
     try { await page.screenshot({ path: path.join(dir, 'cp021-fallo-' + Date.now() + '.png'), timeout: 5000 }); } catch {}
     console.log('❌ CP-021 FAILED: ' + error.message);
