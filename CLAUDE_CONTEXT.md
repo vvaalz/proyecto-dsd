@@ -369,6 +369,10 @@ La suite en el repositorio contiene actualmente los CP-001 a CP-145, organizados
 | CP-147 | tests-playwright/04-panel-control/01-general/cp147-navegacion-pestanas-panel-control.js | Navegación entre pestañas: Dashboard↔Tienda online cambian correctamente la clase `.active` del `.tab-pane` correspondiente. Confirma también (verificación rápida) que el click en "Twilio" no cambia nada — el hallazgo completo se investiga a fondo en CP-148. |
 | CP-148 | tests-playwright/04-panel-control/01-general/cp148-tab-twilio-no-funcional.js | Investigación dedicada del tab "Twilio": 3 intentos de click, captura de `page.on('console')`/`page.on('dialog')`, comparación de URL y de la lista de `.tab-pane` antes/después. Confirma que es un link roto/no habilitado en este entorno (sin errores de consola, sin diálogos, sin romper el resto del módulo) — documentado como ⚠️ hallazgo, no como fallo. |
 | CP-149 | tests-playwright/04-panel-control/01-general/cp149-buscador-configuraciones-no-filtra.js | Buscador `#input_search_setting`: escribe "comisiones" y cuenta secciones visibles del acordeón antes/después — confirma que las 18 secciones visibles siguen todas visibles (no filtra), y que limpiar el campo restaura el listado sin romper nada. Documentado como ⚠️ hallazgo. Si en el futuro se corrige el buscador, este CP pasará a ✅ automáticamente (la validación de "sí filtra" ya está codificada como camino alternativo). |
+| CP-150 | tests-playwright/04-panel-control/01-general/cp150-configuracion-general-comisiones.js | Primer CP del Bloque B (secciones del acordeón). Sección 20: cambia `#commission_for_sale` (input numérico) de su valor original a `7.5000`, guarda con `#save_settings`, refresca (`refrescarConCacheLimpia`) y valida persistencia; restaura el valor original al final y guarda de nuevo — patrón "editar→guardar→verificar→restaurar" que se repite en los CPs siguientes del bloque. Si el CP falla a mitad de camino, el `catch` intenta restaurar igual (recuperación de emergencia) antes de salir. |
+| CP-151 | tests-playwright/04-panel-control/01-general/cp151-envio-facturas-por-correo.js | Sección 7: invierte `#is_basic_template_send_invoices` (checkbox). **Hallazgo de patrón**: el primer intento solo disparando `change` NO persistió el valor — hubo que agregar también un `dispatchEvent(new Event('click'))` para que el listener de la app sincronizara el input hidden `is_basic_template_send_invoices_hide` (que es lo que realmente se envía al guardar). Ver nota de patrón en la sección 19. |
+| CP-152 | tests-playwright/04-panel-control/01-general/cp152-compras-externas.js | Sección 18: invierte `#date_external_purchases_checkbox` (único campo de la sección) usando el patrón `click`+`change` ya confirmado en CP-151. |
+| CP-153 | tests-playwright/04-panel-control/01-general/cp153-fidelidad-de-clientes.js | Sección 19: invierte `#points_by_company_checkbox` (único campo de la sección), mismo patrón. |
 
 ---
 
@@ -741,11 +745,22 @@ Al clickear el `<a href="#twilio_config">`, **no pasa nada observable**: no camb
 
 ### Notas para el diseño de CPs
 - Dado el tamaño de algunas secciones (91 y 58 campos), no tiene sentido probar campo por campo — el patrón realista por sección es: expandir → cambiar UN campo representativo (o activar un toggle) → guardar con el botón compartido `#save_settings` → refrescar y verificar que el valor persiste.
-- Como el guardado es compartido entre TODAS las secciones del tab Dashboard, hay que tener cuidado de no dejar cambios de una sección afectando la corriente de otro CP — cada CP que modifique un valor debería idealmente restaurar el valor original al final, o usar campos que no rompan otros módulos si quedan modificados (similar al cuidado ya aplicado con datos descartables en otros módulos).
+- Como el guardado es compartido entre TODAS las secciones del tab Dashboard, hay que tener cuidado de no dejar cambios de una sección afectando la corriente de otro CP — cada CP que modifique un valor debería idealmente restaurar el valor original al final, o usar campos que no rompan otros módulos si quedan modificados (similar al cuidado ya aplicado con datos descartables en otros módulos). Patrón usado desde CP-150: leer el valor original, cambiar, guardar, verificar, **restaurar el original y guardar de nuevo** — con un intento de restauración también en el `catch` por si el CP falla a mitad de camino.
+- **Patrón de campos tipo checkbox — confirmado en CP-151** (hallazgo, no obvio de antemano): los checkboxes de este panel tienen un input `hidden` compañero (`<id>_hide`) que es el que realmente se envía al guardar. Para que la app sincronice ese hidden hay que disparar **tanto `'click'` como `'change'`** tras asignar `.checked` manualmente — disparar solo `'change'` (el patrón usado en el resto de la suite para selects/checkboxes simples) NO fue suficiente aquí y el valor no persistió en el primer intento de CP-151. Patrón validado:
+  ```javascript
+  await page.evaluate(({ id, valor }) => {
+    const el = document.getElementById(id);
+    el.checked = valor;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    el.dispatchEvent(new Event('click', { bubbles: true }));
+  }, { id, valor });
+  ```
+  Este patrón ya se replicó con éxito en CP-152 y CP-153 (ambos pasaron al primer intento) — usarlo por defecto para cualquier checkbox nuevo dentro de `/sett/setting`, no solo disparar `change`.
+- Al guardar (`#save_settings`) **no aparece ningún SweetAlert ni toast de confirmación observable** — la única forma confiable de validar que un cambio se guardó es refrescar la página (`refrescarConCacheLimpia`) y volver a leer el campo, no buscar un mensaje de éxito en pantalla.
 
 ### Estado de implementación (actualizado 2026-07-08)
-Propuesta original de ~26 CPs organizada en 4 bloques — solo el primero está implementado:
+Propuesta original de ~26 CPs organizada en 4 bloques:
 - **Bloque A (carga + navegación) — ✅ implementado**: CP-146 (carga del módulo), CP-147 (navegación entre pestañas).
 - **Bloque D (hallazgos) — ✅ implementado**: CP-148 (Twilio no funcional), CP-149 (buscador no filtra).
-- **Bloque B (19 secciones del acordeón Dashboard) — pendiente**: un CP por sección (expandir/editar/guardar/persistir), la sección de comisiones (20) ya está bien caracterizada arriba y es la candidata más simple para empezar.
+- **Bloque B (19 secciones del acordeón Dashboard) — en progreso, 4/19**: CP-150 (comisiones, input numérico), CP-151 (envío de facturas por correo, checkbox), CP-152 (compras externas, checkbox), CP-153 (fidelidad de clientes, checkbox). Quedan 15 secciones — las 2 más grandes (91 y 58 campos) probablemente conviene abordarlas después de tener más CPs "pequeños" ya andando, para no repetir ajustes de patrón sobre una sección compleja.
 - **Bloque C (tab Tienda online) — pendiente**: carga, editar+guardar (`#save_settings_store`), posible CP de carga de archivos (`#file_header`/`#file_footer`).
