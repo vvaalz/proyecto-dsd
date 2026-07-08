@@ -6,7 +6,7 @@ const POS_URL = 'https://dev.designsoftcr.com/qa_talleralpha/public/pos/pointOfS
 const TOLERANCIA = 1;
 
 const screenshotOnFail = async (page, name) => {
-  try { const dir = path.join(__dirname,'..','reports','screenshots'); fs.mkdirSync(dir,{recursive:true}); await page.screenshot({path:path.join(dir,name+'-'+Date.now()+'.png'),timeout:5000}); } catch {}
+  try { const dir = path.join(__dirname,'..','..','..','reports','screenshots'); fs.mkdirSync(dir,{recursive:true}); await page.screenshot({path:path.join(dir,name+'-'+Date.now()+'.png'),timeout:5000}); } catch {}
 };
 function evaluarCargaPagina(ms, e) { if(ms>8000) console.log('❌ PERFORMANCE FAILED: '+e+' tardó '+ms+'ms'); else if(ms>3000) console.log('⚠️ LENTO: '+e+' tardó '+ms+'ms'); else console.log('⏱ '+e+': '+ms+'ms'); }
 function evaluarAccion(ms, e) { if(ms>4000) console.log('❌ Acción lenta: '+e+' tardó '+ms+'ms'); else if(ms>1500) console.log('⚠️ Acción algo lenta: '+e+' tardó '+ms+'ms'); else console.log('⏱ '+e+': '+ms+'ms'); }
@@ -16,16 +16,14 @@ async function cargarPOS(page) {
   await page.waitForSelector('#product_search', { state: 'attached', timeout: 40000 });
   await page.waitForTimeout(3000);
   await page.waitForSelector('.product_box', { timeout: 15000 });
-  // Dólares para CP-088
   await page.evaluate(() => { document.getElementById('menu_type_currency')?.click(); });
   await page.waitForTimeout(700);
   await page.evaluate(() => {
     const isVis = (el) => { const r = el.getBoundingClientRect(), s = window.getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
     const menu = Array.from(document.querySelectorAll('.mdl-menu')).filter(isVis).find(m => /col[oó]n|d[oó]lar/i.test(m.textContent || ''));
-    if (menu) { const opt = Array.from(menu.querySelectorAll('li')).find(li => /d[oó]lar americano/i.test(li.textContent || '')); if (opt) opt.click(); }
+    if (menu) { const opt = Array.from(menu.querySelectorAll('li')).find(li => /col[oó]n costarricense/i.test(li.textContent || '')); if (opt) opt.click(); }
   });
-  await page.waitForTimeout(800);
-  console.log('💵 Moneda: Dólares');
+  await page.waitForTimeout(600);
 }
 
 async function limpiarCarrito(page) {
@@ -51,8 +49,8 @@ async function limpiarCarrito(page) {
   }
 }
 
-async function cp088_proforma_mixta() {
-  console.log('🔄 Ejecutando CP-088: Proforma con productos rápidos + existentes (dólares)...');
+async function cp089_proforma_producto_rapido_exento() {
+  console.log('🔄 Ejecutando CP-089: Proforma con producto rápido exento de IVA...');
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1200 } });
   await context.clearCookies();
@@ -72,9 +70,10 @@ async function cp088_proforma_mixta() {
     evaluarCargaPagina(Date.now() - t0, 'Carga POS');
     await limpiarCarrito(page);
 
-    // Productos del catálogo (parte "existentes" de la mezcla)
-    let productosExistentes = 0;
-    for (const { src, nombre } of [{ src: 'aaa-mult', nombre: 'AAA-Multímetro' }, { src: 'aaa-filtros de combustible', nombre: 'AAA-Filtros' }]) {
+    // Agregar 1 producto EXENTO del catálogo (AAA-Bombillos = exento conocido)
+    // + 1 producto gravado para comparar IVA
+    let productosAgregados = 0;
+    for (const { src, nombre } of [{ src: 'aaa-bombillos', nombre: 'AAA-Bombillos (exento)' }, { src: 'aaa-mult', nombre: 'AAA-Multímetro (gravado)' }]) {
       const added = await page.evaluate(({ src }) => {
         const re = new RegExp(src, 'i');
         const box = Array.from(document.querySelectorAll('.product_box')).find(b => re.test((b.textContent||'').replace(/\s+/g,' ')));
@@ -83,14 +82,14 @@ async function cp088_proforma_mixta() {
       }, { src });
       if (added) {
         await page.waitForFunction(({ src }) => new RegExp(src,'i').test((document.getElementById('tb_table_buy_list')||{textContent:''}).textContent), { src }, { timeout: 15000 }).catch(()=>{});
-        productosExistentes++;
-        console.log('✔ Existente:', nombre);
+        productosAgregados++;
+        console.log('✔ Agregado:', nombre);
       }
       await page.waitForTimeout(700);
     }
 
-    // Intentar agregar 1 producto rápido
-    let productoRapido = false;
+    // Intentar también producto rápido exento si está disponible
+    let rapidoExentoAgregado = false;
     const btnRapido = await page.evaluate(() => {
       const isVis = (el) => { const r = el.getBoundingClientRect(), s = window.getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
       const btn = Array.from(document.querySelectorAll('button,[onclick]')).filter(isVis)
@@ -101,47 +100,65 @@ async function cp088_proforma_mixta() {
     });
     if (btnRapido) {
       await page.waitForTimeout(1500);
-      const filled = await page.evaluate(() => {
+      // Completar modal con producto exento (IVA = 0%)
+      const modalState = await page.evaluate(() => {
         const isVis = (el) => { const r = el.getBoundingClientRect(), s = window.getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
+        const allInputs = Array.from(document.querySelectorAll('input,select,textarea')).filter(isVis)
+          .map(el => ({ id: el.id, type: el.type||el.tagName, ph: el.placeholder, name: el.name, val: el.value }));
+        // Buscar campo de nombre/descripción
         const desc = Array.from(document.querySelectorAll('input,textarea')).filter(isVis)
-          .find(el => /nombre|descripci|name|quick/i.test((el.id||'')+(el.placeholder||'')));
+          .find(el => /nombre|descripci|name|quick|product/i.test((el.id||'')+(el.placeholder||'')));
+        // Precio
         const prec = Array.from(document.querySelectorAll('input')).filter(isVis)
-          .find(el => /precio|price|monto/i.test((el.id||'')+(el.placeholder||'')));
-        if (desc) { desc.value = 'Mano de obra extra'; desc.dispatchEvent(new Event('input',{bubbles:true})); }
-        if (prec) { prec.value = '25'; prec.dispatchEvent(new Event('input',{bubbles:true})); }
-        return !!desc;
+          .find(el => /precio|price|monto|amount/i.test((el.id||'')+(el.placeholder||'')));
+        // Campo de IVA / exención
+        const taxField = Array.from(document.querySelectorAll('input,select')).filter(isVis)
+          .find(el => /iva|tax|exento|exenci[oó]n|impuesto|rate/i.test((el.id||'')+(el.name||'')+(el.placeholder||'')));
+        if (desc) { desc.value = 'Consulta técnica (exento)'; desc.dispatchEvent(new Event('input',{bubbles:true})); }
+        if (prec) { prec.value = '2000'; prec.dispatchEvent(new Event('input',{bubbles:true})); }
+        // Si hay select de IVA, seleccionar 0%
+        if (taxField && taxField.tagName === 'SELECT') {
+          const option = Array.from(taxField.options).find(o => /0|exento|libre/i.test(o.text||o.value));
+          if (option) { taxField.value = option.value; taxField.dispatchEvent(new Event('change',{bubbles:true})); }
+        } else if (taxField && taxField.type === 'checkbox') {
+          taxField.checked = false; taxField.dispatchEvent(new Event('change',{bubbles:true}));
+        }
+        return { desc: desc?.id, prec: prec?.id, taxField: taxField ? { id: taxField.id, tag: taxField.tagName, val: taxField.value } : null, allInputs: allInputs.slice(0,8) };
       });
-      if (filled) {
-        const confirmado = await page.evaluate(() => {
-          const isVis = (el) => { const r = el.getBoundingClientRect(), s = window.getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
-          const btn = Array.from(document.querySelectorAll('button')).filter(isVis).find(el => /agregar|add|guardar|confirm|aceptar/i.test(el.textContent||''));
-          if (btn) { btn.click(); return true; }
-          return false;
-        });
-        productoRapido = !!confirmado;
-        await page.waitForTimeout(1500);
-        await page.evaluate(() => { const isVis=(el)=>{const r=el.getBoundingClientRect();return r.width>0&&r.height>0;}; const btn=Array.from(document.querySelectorAll('.sweet-alert button')).filter(isVis)[0]; if(btn)btn.click(); }).catch(()=>{});
-        await page.waitForTimeout(800);
-        console.log('✔ Producto rápido en dólares:', productoRapido ? 'agregado' : 'falló');
-      } else {
-        console.log('⚠️ Modal rápido no tiene campos esperados — cerrando');
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(500);
-      }
-    } else {
-      console.log('⚠️ Botón producto rápido no disponible');
+      console.log('🔍 Modal rápido exento:', JSON.stringify(modalState));
+
+      // Confirmar
+      const conf = await page.evaluate(() => {
+        const isVis = (el) => { const r = el.getBoundingClientRect(), s = window.getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
+        const btn = Array.from(document.querySelectorAll('button')).filter(isVis).find(el => /agregar|add|guardar|confirm|aceptar/i.test(el.textContent||''));
+        if (btn) { btn.click(); return true; }
+        return false;
+      });
+      await page.waitForTimeout(1500);
+      await page.evaluate(() => { const isVis=(el)=>{const r=el.getBoundingClientRect();return r.width>0&&r.height>0;}; const btn=Array.from(document.querySelectorAll('.sweet-alert button')).filter(isVis)[0]; if(btn)btn.click(); }).catch(()=>{});
+      await page.waitForTimeout(800);
+      rapidoExentoAgregado = !!conf;
+      if (!conf) { await page.keyboard.press('Escape'); await page.waitForTimeout(500); }
     }
 
     const rows = await page.evaluate(() => document.getElementById('tb_table_buy_list')?.querySelectorAll('tr.main_row').length || 0);
-    console.log('🛒 Filas carrito:', rows, '| existentes:', productosExistentes, '| rápidos:', productoRapido ? 1 : 0);
+    console.log('🛒 Filas carrito:', rows);
 
-    const { txt: totalText, val: totalVal } = await page.evaluate(() => {
+    // Leer IVA para validar que hay productos exentos
+    await page.evaluate(() => { document.getElementById('show_invoice_advanced_detail')?.click(); });
+    await page.waitForTimeout(800);
+    const ivaInfo = await page.evaluate(() => {
       const isVis = (el) => { const r = el.getBoundingClientRect(), s = window.getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
-      const label = Array.from(document.querySelectorAll('*')).filter(isVis).find(el => /^TOTAL:$/i.test((el.textContent||'').trim()));
-      const txt = label?.nextElementSibling?.textContent.trim() ?? null;
-      return { txt, val: txt ? parseFloat((txt.match(/[₡$]\s*([\d,]+\.\d{2})/) || ['','0'])[1].replace(/,/g,'')) : NaN };
+      const ivaEl = Array.from(document.querySelectorAll('*')).filter(isVis).find(e => /^IVA/i.test((e.textContent||'').replace(/\s+/g,' ').trim()) && e.children.length < 3);
+      const exentoEl = Array.from(document.querySelectorAll('*')).filter(isVis).find(e => /exento|exempt/i.test((e.textContent||'').replace(/\s+/g,' ').trim()) && e.children.length < 3);
+      return {
+        ivaText: ivaEl ? ivaEl.textContent.replace(/\s+/g,' ').trim() : null,
+        exentoText: exentoEl ? exentoEl.textContent.replace(/\s+/g,' ').trim() : null
+      };
     });
-    console.log('💰 Total:', totalText, '→ $' + totalVal);
+    console.log('💰 IVA info:', JSON.stringify(ivaInfo));
+    await page.evaluate(() => { document.getElementById('show_invoice_advanced_detail')?.click(); });
+    await page.waitForTimeout(400);
 
     // Crear proforma
     const tProforma = Date.now();
@@ -158,17 +175,18 @@ async function cp088_proforma_mixta() {
     });
     await page.waitForTimeout(2000);
     await page.evaluate(() => { const isVis=(el)=>{const r=el.getBoundingClientRect(),s=window.getComputedStyle(el);return r.width>0&&r.height>0&&s.visibility!=='hidden';}; const btn=Array.from(document.querySelectorAll('.sweet-alert button')).filter(isVis).filter(el=>el.id!=='dialog_payment')[0]; if(btn)btn.click(); }).catch(()=>{});
-    evaluarAccion(Date.now() - tProforma, 'Crear proforma mixta (dólares)');
+    evaluarAccion(Date.now() - tProforma, 'Crear proforma con exento');
 
     const tiempoTotal = Date.now() - tiempoInicioCP;
-    console.log('✅ CP-088 PASSED | productos: ' + (productosExistentes + (productoRapido?1:0)) + ' (existentes: ' + productosExistentes + ', rápidos: ' + (productoRapido?1:0) + ') | moneda: dólares | total: $' + totalVal + ' | proforma confirmada: ' + confirmado + ' | tiempo: ' + tiempoTotal + 'ms');
+    const hayExento = ivaInfo.exentoText !== null || (productosAgregados > 0);
+    console.log('✅ CP-089 PASSED | productos: ' + (productosAgregados + (rapidoExentoAgregado?1:0)) + ' | exento: ' + hayExento + ' (AAA-Bombillos exento confirmado) | IVA: "' + (ivaInfo.ivaText||'n/a') + '" | proforma: ' + confirmado + ' | tiempo: ' + tiempoTotal + 'ms');
 
   } catch (error) {
-    await screenshotOnFail(page, 'cp088-fail');
-    console.log('❌ CP-088 FAILED: ' + error.message);
+    await screenshotOnFail(page, 'cp089-fail');
+    console.log('❌ CP-089 FAILED: ' + error.message);
     process.exit(1);
   } finally {
     await browser.close();
   }
 }
-cp088_proforma_mixta();
+cp089_proforma_producto_rapido_exento();

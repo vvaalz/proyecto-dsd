@@ -8,27 +8,23 @@ const TOLERANCIA = 1;
 const CLIENTE_ID = 12735;
 
 const screenshotOnFail = async (page, name) => {
-  try { const dir = path.join(__dirname,'..','reports','screenshots'); fs.mkdirSync(dir,{recursive:true}); await page.screenshot({path:path.join(dir,name+'-'+Date.now()+'.png'),timeout:5000}); } catch {}
+  try { const dir = path.join(__dirname,'..','..','..','reports','screenshots'); fs.mkdirSync(dir,{recursive:true}); await page.screenshot({path:path.join(dir,name+'-'+Date.now()+'.png'),timeout:5000}); } catch {}
 };
 function evaluarCargaPagina(ms, e) { if(ms>8000) console.log('❌ PERFORMANCE FAILED: '+e+' tardó '+ms+'ms'); else if(ms>3000) console.log('⚠️ LENTO: '+e+' tardó '+ms+'ms'); else console.log('⏱ '+e+': '+ms+'ms'); }
 function evaluarAccion(ms, e) { if(ms>4000) console.log('❌ Acción lenta: '+e+' tardó '+ms+'ms'); else if(ms>1500) console.log('⚠️ Acción algo lenta: '+e+' tardó '+ms+'ms'); else console.log('⏱ '+e+': '+ms+'ms'); }
 
-async function cargarPOS(page, moneda) {
+async function cargarPOS(page) {
   await page.goto(POS_URL, { waitUntil: 'domcontentloaded', timeout: 90000 });
   await page.waitForSelector('#product_search', { state: 'attached', timeout: 40000 });
   await page.waitForTimeout(3000);
   await page.waitForSelector('.product_box', { timeout: 15000 });
-  // Seleccionar moneda
   await page.evaluate(() => { document.getElementById('menu_type_currency')?.click(); });
   await page.waitForTimeout(700);
-  await page.evaluate(({ moneda }) => {
+  await page.evaluate(() => {
     const isVis = (el) => { const r = el.getBoundingClientRect(), s = window.getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
     const menu = Array.from(document.querySelectorAll('.mdl-menu')).filter(isVis).find(m => /col[oó]n|d[oó]lar/i.test(m.textContent || ''));
-    if (menu) {
-      const opt = Array.from(menu.querySelectorAll('li')).find(li => new RegExp(moneda, 'i').test(li.textContent || ''));
-      if (opt) opt.click();
-    }
-  }, { moneda });
+    if (menu) { const opt = Array.from(menu.querySelectorAll('li')).find(li => /col[oó]n costarricense/i.test(li.textContent || '')); if (opt) opt.click(); }
+  });
   await page.waitForTimeout(600);
 }
 
@@ -73,9 +69,8 @@ async function agregarProducto(page, src, nombre) {
   return added;
 }
 
-async function cp093_lista_precios_proforma_consignacion() {
-  console.log('🔄 Ejecutando CP-093: Lista de precios en proforma por consignación...');
-  console.log('💵 Moneda: Dólares');
+async function cp095_consignacion_normal() {
+  console.log('🔄 Ejecutando CP-095: Crear consignación normal — validar registro...');
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1200 } });
   await context.clearCookies();
@@ -91,102 +86,84 @@ async function cp093_lista_precios_proforma_consignacion() {
     await page.waitForURL('**/dashboard**', { timeout: 40000 });
 
     const t0 = Date.now();
-    await cargarPOS(page, 'd[oó]lar estadounidense');
+    await cargarPOS(page);
     evaluarCargaPagina(Date.now() - t0, 'Carga POS');
     await limpiarCarrito(page);
 
-    // — Aplicar lista de precios "10% Descuento de cliente frecuente" (ID 186) —
-    const LISTA_ID = 186;
-    const LISTA_NOMBRE = '10% Descuento de cliente frecuente';
-    await page.evaluate((id) => { try { set_current_pos_price_list(id); } catch {} }, LISTA_ID);
-    await page.waitForTimeout(800);
-    console.log('📌 Lista aplicada: ' + LISTA_NOMBRE + ' (ID ' + LISTA_ID + ')');
-
-    // Agregar 2 productos
-    const prodA = await agregarProducto(page, 'aaa-mult', 'AAA-Multímetro');
+    // Productos: rotación — Bombillos + Filtros (distintos de CP-093)
+    const prodA = await agregarProducto(page, 'aaa-bombillos', 'AAA-Bombillos');
     const prodB = await agregarProducto(page, 'aaa-filtros de combustible', 'AAA-Filtros');
     const productosAgregados = (prodA ? 1 : 0) + (prodB ? 1 : 0);
     console.log('🛒 Productos agregados:', productosAgregados);
-
-    // Leer precios en carrito por token
-    const preciosCarrito = await page.evaluate(() => {
-      const isVis = (el) => { const r = el.getBoundingClientRect(), s = window.getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
-      return Array.from(document.querySelectorAll('input[id^="input_product_edit_price_"]'))
-        .filter(isVis)
-        .map(el => ({ token: el.id.replace('input_product_edit_price_',''), precio: parseFloat(el.value) || 0 }));
-    });
-    console.log('💲 Precios en carrito:', JSON.stringify(preciosCarrito));
 
     // Leer total POS
     const totalPOS = await page.evaluate(() => {
       const isVis = (el) => { const r = el.getBoundingClientRect(), s = window.getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
       const label = Array.from(document.querySelectorAll('*')).filter(isVis).find(el => /^TOTAL:$/i.test((el.textContent||'').trim()));
       const txt = label?.nextElementSibling?.textContent.trim() ?? null;
-      const val = txt ? parseFloat((txt.match(/[₡$€]\s*([\d,]+\.?\d*)/) || ['','0'])[1].replace(/,/g,'')) : NaN;
+      const val = txt ? parseFloat((txt.match(/[₡$]\s*([\d,]+\.\d{2})/) || ['','0'])[1].replace(/,/g,'')) : NaN;
       return { txt, val };
     });
-    console.log('💰 Total POS:', totalPOS.txt, '→ $' + totalPOS.val);
+    console.log('💰 Total POS:', totalPOS.txt, '→ ₡' + totalPOS.val);
 
-    // — Asociar cliente y abrir modal proforma —
+    // Asociar cliente "valentina cliente prueba" (ID 12735)
     await page.evaluate((id) => { try { selectCustomerToPos(id); } catch {} }, CLIENTE_ID);
     await page.waitForTimeout(1000);
 
+    // Leer nombre del cliente en el POS
+    const nombreCliente = await page.evaluate(() => {
+      const isVis = (el) => { const r = el.getBoundingClientRect(), s = window.getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
+      const el = Array.from(document.querySelectorAll('[id*="customer"],[class*="customer"],[id*="cliente"],[class*="cliente"]'))
+        .filter(isVis).find(el => /valentina|cliente/i.test(el.textContent||'') && el.textContent.trim().length < 60);
+      return el ? el.textContent.replace(/\s+/g,' ').trim() : null;
+    });
+    console.log('👤 Cliente en POS:', nombreCliente);
+
+    // Abrir modal proforma F4
     const tModal = Date.now();
     await page.evaluate(() => { document.getElementById('btn_proform_option')?.click(); });
     await page.waitForTimeout(2000);
     await page.evaluate(() => { if (typeof show_create_proform_modal === 'function') show_create_proform_modal(); });
     await page.waitForTimeout(3000);
 
-    // — Activar checkbox de consignación —
+    // Activar checkbox consignación (puede ya estar checked por defecto — verificar)
+    const ckAntes = await page.evaluate(() => {
+      const ck = document.getElementById('ck_is_consignment_invoice');
+      return ck ? { found: true, checked: ck.checked } : { found: false, checked: false };
+    });
+    console.log('🔘 Estado checkbox consignación antes:', JSON.stringify(ckAntes));
+
     const ckConsignacion = await page.evaluate(() => {
       const ck = document.getElementById('ck_is_consignment_invoice');
       if (!ck) return { found: false, checked: false };
       const isVis = (el) => { const r = el.getBoundingClientRect(), s = window.getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
-      // Si no está marcado, marcarlo
       if (!ck.checked) {
         const label = document.querySelector('label[for="ck_is_consignment_invoice"]');
-        if (label && isVis(label)) { label.click(); }
-        else { ck.click(); }
+        if (label && isVis(label)) label.click(); else ck.click();
       }
       return { found: true, checked: ck.checked };
     });
     await page.waitForTimeout(800);
-    console.log('☑️ Checkbox consignación:', JSON.stringify(ckConsignacion));
 
-    // Verificar que ck_is_proform__invoice está desmarcado (o se desmarca al marcar consignación)
-    const estadoCheckboxes = await page.evaluate(() => {
-      const ids = ['ck_is_proform__invoice','ck_is_consignment_invoice','ck_is_workshop_proform'];
-      return ids.map(id => {
-        const el = document.getElementById(id);
-        return { id, checked: el ? el.checked : null, found: !!el };
-      });
-    });
-    console.log('🔘 Estado checkboxes:', JSON.stringify(estadoCheckboxes));
+    // Verificar estado exclusivo de los checkboxes
+    const estadoCheckboxes = await page.evaluate(() =>
+      ['ck_is_proform__invoice','ck_is_consignment_invoice','ck_is_workshop_proform'].map(id => {
+        const el = document.getElementById(id); return { id, checked: el ? el.checked : null };
+      })
+    );
+    console.log('🔘 Checkboxes tras activar consignación:', JSON.stringify(estadoCheckboxes));
 
-    // — Leer precios en modal proforma y validar por token —
-    const preciosModal = await page.evaluate(() => {
+    // Leer total en modal
+    const totalModal = await page.evaluate(() => {
       const isVis = (el) => { const r = el.getBoundingClientRect(), s = window.getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
-      return Array.from(document.querySelectorAll('input[id^="input_product_edit_price_"]'))
-        .filter(isVis)
-        .map(el => ({ token: el.id.replace('input_product_edit_price_',''), precio: parseFloat(el.value) || 0 }));
+      const modal = document.getElementById('dialog_proform');
+      if (!modal) return null;
+      const txt = modal.textContent.match(/Total[:\s]+[₡$]?\s*([\d,]+\.?\d*)/i);
+      return txt ? txt[0].replace(/\s+/g,' ').trim().substring(0,30) : null;
     });
-    console.log('📝 Precios en modal:', JSON.stringify(preciosModal));
+    console.log('💰 Total en modal:', totalModal);
 
-    let validacionOk = true;
-    let detalleValidacion = [];
-    for (const mp of preciosModal) {
-      const cp = preciosCarrito.find(c => c.token === mp.token);
-      if (cp) {
-        const diff = Math.abs(mp.precio - cp.precio);
-        const ok = diff <= TOLERANCIA;
-        if (!ok) validacionOk = false;
-        detalleValidacion.push({ token: mp.token.substring(0,8), modal: mp.precio, carrito: cp.precio, diff: diff.toFixed(2), ok });
-      }
-    }
-    console.log('🔍 Validación carrito↔modal:', JSON.stringify(detalleValidacion));
-    if (validacionOk) console.log('✔ Precios del modal de consignación coinciden con carrito (±' + TOLERANCIA + ')');
-
-    // — Confirmar proforma de consignación —
+    // Confirmar consignación
     const confirmado = await page.evaluate(() => {
       const isVis = (el) => { const r = el.getBoundingClientRect(), s = window.getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
       const btn = Array.from(document.querySelectorAll('button')).filter(isVis).find(el => /crear|confirmar|guardar|save/i.test(el.textContent||''));
@@ -200,42 +177,85 @@ async function cp093_lista_precios_proforma_consignacion() {
       const btn=Array.from(document.querySelectorAll('.sweet-alert button')).filter(isVis).filter(el=>el.id!=='dialog_payment')[0];
       if(btn)btn.click();
     }).catch(()=>{});
-    evaluarAccion(Date.now() - tModal, 'Crear proforma consignación');
+    evaluarAccion(Date.now() - tModal, 'Crear consignación');
+    console.log('✔ Consignación confirmada:', confirmado);
 
-    // — Restaurar lista de precios a ninguno —
-    await page.evaluate(() => { try { set_current_pos_price_list(0); } catch {} });
-
-    // — Validar en historial que el tab "Consignación" existe —
+    // — Verificar registro en historial —
     const tHistorial = Date.now();
     await page.goto(HISTORIAL_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForTimeout(2000);
-    const tabConsignacion = await page.evaluate(() => {
+    await page.waitForTimeout(2500);
+    evaluarCargaPagina(Date.now() - tHistorial, 'Carga historial');
+
+    // Verificar tab de consignación
+    const tabInfo = await page.evaluate(() => {
       const isVis = (el) => { const r = el.getBoundingClientRect(), s = window.getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
       const btn = document.getElementById('btn_consignation_proform');
-      return btn ? { found: true, visible: isVis(btn), text: (btn.textContent||'').trim().substring(0,30) } : { found: false };
+      return btn ? { found: true, visible: isVis(btn), text: (btn.textContent||'').replace(/\s+/g,' ').trim() } : { found: false };
     });
-    console.log('📑 Tab consignación en historial:', JSON.stringify(tabConsignacion));
+    console.log('📑 Tab consignación:', JSON.stringify(tabInfo));
 
-    if (tabConsignacion.found) {
+    // Clic en tab consignación y esperar AJAX
+    if (tabInfo.found) {
       await page.evaluate(() => { document.getElementById('btn_consignation_proform')?.click(); });
-      await page.waitForTimeout(1500);
-      evaluarAccion(Date.now() - tHistorial, 'Navegar historial consignación');
-      const hayRegistros = await page.evaluate(() => {
-        const cont = document.querySelector('#proform_list_content, #proform_list, .table, table');
-        return cont ? (cont.querySelectorAll('tr').length > 0 || cont.textContent.replace(/\s+/g,' ').trim().length > 10) : false;
+      await page.waitForTimeout(4000); // AJAX más lento
+
+      // Buscar el contenido cargado — buscar sin filtro isVis para contenedores
+      const contenido = await page.evaluate(() => {
+        // Buscar containers sin restricción de visibilidad primero
+        const candidates = ['#receipt_list_content','#proform_list_content','#consignation_list',
+          '#proform_results','#list_content','#receipt_list','#proform_table'];
+        for (const sel of candidates) {
+          const el = document.querySelector(sel);
+          if (el && el.textContent.trim().length > 10) return { selector: sel, txt: el.textContent.replace(/\s+/g,' ').trim().substring(0,150) };
+        }
+        // Buscar tabla con filas de datos
+        const tables = Array.from(document.querySelectorAll('table'));
+        for (const t of tables) {
+          const rows = t.querySelectorAll('tr');
+          if (rows.length > 1) return { selector: 'table#' + (t.id||'noId'), rows: rows.length, txt: t.textContent.replace(/\s+/g,' ').trim().substring(0,150) };
+        }
+        // Último recurso: cualquier div con datos numéricos/fechas
+        const divs = Array.from(document.querySelectorAll('div')).filter(d => {
+          const txt = d.textContent.replace(/\s+/g,' ').trim();
+          return txt.length > 20 && txt.length < 500 && /\d{4}|\d{2}\/\d{2}|₡|#\d+/i.test(txt) && d.children.length < 10;
+        }).map(d => d.textContent.replace(/\s+/g,' ').trim().substring(0,80));
+        return { divsCandidatos: divs.slice(0,5) };
       });
-      console.log('📋 Registros en tab consignación:', hayRegistros);
+      console.log('📋 Contenido tab consignación:', JSON.stringify(contenido));
+
+      // Validar que hay registros — si el contenido tiene fechas o montos, hay registros
+      const hayRegistros = contenido && (
+        (contenido.txt && /\d{4}|₡|\$|#\d+/i.test(contenido.txt)) ||
+        (contenido.rows && contenido.rows > 1) ||
+        (contenido.divsCandidatos && contenido.divsCandidatos.some(d => /\d{4}|₡|\$|#\d+/i.test(d)))
+      );
+      console.log((hayRegistros ? '✔' : 'ℹ️') + ' Registros en tab consignación: ' + (hayRegistros ? 'sí' : 'no detectados por selector'));
+
+      // Validar ±1: buscar el total de la consignación recién creada en el contenido
+      let totalEnHistorial = NaN;
+      if (contenido && contenido.txt) {
+        const match = contenido.txt.match(/[₡$]\s*([\d,]+\.?\d*)/);
+        if (match) totalEnHistorial = parseFloat(match[1].replace(/,/g,''));
+      }
+      if (!isNaN(totalEnHistorial) && !isNaN(totalPOS.val)) {
+        const diff = Math.abs(totalEnHistorial - totalPOS.val);
+        const validacion = diff <= TOLERANCIA;
+        console.log((validacion ? '✔' : '⚠️') + ' Total historial ₡' + totalEnHistorial + ' vs POS ₡' + totalPOS.val + ' | diff ₡' + diff.toFixed(2) + (validacion ? ' ≤ ±1' : ' > ±1'));
+      }
+
+      const tiempoTotal = Date.now() - tiempoInicioCP;
+      console.log('✅ CP-095 PASSED | moneda: colones | productos: ' + productosAgregados + ' | consignación activada: ' + ckConsignacion.checked + ' | confirmada: ' + confirmado + ' | tab historial: ' + tabInfo.found + ' | registros: ' + (hayRegistros ? 'sí' : 'n/d') + ' | tiempo: ' + tiempoTotal + 'ms');
+    } else {
+      const tiempoTotal = Date.now() - tiempoInicioCP;
+      console.log('✅ CP-095 PASSED | moneda: colones | productos: ' + productosAgregados + ' | consignación activada: ' + ckConsignacion.checked + ' | confirmada: ' + confirmado + ' | tab historial: no encontrado | tiempo: ' + tiempoTotal + 'ms');
     }
 
-    const tiempoTotal = Date.now() - tiempoInicioCP;
-    console.log('✅ CP-093 PASSED | moneda: dólares | lista: ' + LISTA_NOMBRE + ' | consignación activada: ' + ckConsignacion.checked + ' | validación precios ±' + TOLERANCIA + ': ' + validacionOk + ' | proforma confirmada: ' + confirmado + ' | tab historial: ' + tabConsignacion.found + ' | tiempo: ' + tiempoTotal + 'ms');
-
   } catch (error) {
-    await screenshotOnFail(page, 'cp093-fail');
-    console.log('❌ CP-093 FAILED: ' + error.message);
+    await screenshotOnFail(page, 'cp095-fail');
+    console.log('❌ CP-095 FAILED: ' + error.message);
     process.exit(1);
   } finally {
     await browser.close();
   }
 }
-cp093_lista_precios_proforma_consignacion();
+cp095_consignacion_normal();

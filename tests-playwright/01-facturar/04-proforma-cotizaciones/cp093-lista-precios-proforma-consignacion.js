@@ -8,37 +8,28 @@ const TOLERANCIA = 1;
 const CLIENTE_ID = 12735;
 
 const screenshotOnFail = async (page, name) => {
-  try { const dir = path.join(__dirname,'..','reports','screenshots'); fs.mkdirSync(dir,{recursive:true}); await page.screenshot({path:path.join(dir,name+'-'+Date.now()+'.png'),timeout:5000}); } catch {}
+  try { const dir = path.join(__dirname,'..','..','..','reports','screenshots'); fs.mkdirSync(dir,{recursive:true}); await page.screenshot({path:path.join(dir,name+'-'+Date.now()+'.png'),timeout:5000}); } catch {}
 };
 function evaluarCargaPagina(ms, e) { if(ms>8000) console.log('❌ PERFORMANCE FAILED: '+e+' tardó '+ms+'ms'); else if(ms>3000) console.log('⚠️ LENTO: '+e+' tardó '+ms+'ms'); else console.log('⏱ '+e+': '+ms+'ms'); }
 function evaluarAccion(ms, e) { if(ms>4000) console.log('❌ Acción lenta: '+e+' tardó '+ms+'ms'); else if(ms>1500) console.log('⚠️ Acción algo lenta: '+e+' tardó '+ms+'ms'); else console.log('⏱ '+e+': '+ms+'ms'); }
 
-async function cargarPOS(page) {
+async function cargarPOS(page, moneda) {
   await page.goto(POS_URL, { waitUntil: 'domcontentloaded', timeout: 90000 });
   await page.waitForSelector('#product_search', { state: 'attached', timeout: 40000 });
   await page.waitForTimeout(3000);
   await page.waitForSelector('.product_box', { timeout: 15000 });
-  // Moneda: dólares (rotación desde CP-095 que usó colones)
+  // Seleccionar moneda
   await page.evaluate(() => { document.getElementById('menu_type_currency')?.click(); });
   await page.waitForTimeout(700);
-  await page.evaluate(() => {
+  await page.evaluate(({ moneda }) => {
     const isVis = (el) => { const r = el.getBoundingClientRect(), s = window.getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
     const menu = Array.from(document.querySelectorAll('.mdl-menu')).filter(isVis).find(m => /col[oó]n|d[oó]lar/i.test(m.textContent || ''));
     if (menu) {
-      const opt = Array.from(menu.querySelectorAll('li')).find(li => /d[oó]lar estadounidense/i.test(li.textContent || ''));
-      if (opt) { opt.click(); return 'dolares'; }
-      // Fallback: seleccionar cualquier opción que no sea colones
-      const any = Array.from(menu.querySelectorAll('li')).find(li => !/col[oó]n costarricense/i.test(li.textContent || ''));
-      if (any) any.click();
+      const opt = Array.from(menu.querySelectorAll('li')).find(li => new RegExp(moneda, 'i').test(li.textContent || ''));
+      if (opt) opt.click();
     }
-  });
-  await page.waitForTimeout(800);
-  // Verificar moneda activa
-  const monedaActiva = await page.evaluate(() => {
-    const btn = document.getElementById('menu_type_currency');
-    return btn ? btn.textContent.replace(/\s+/g,' ').trim() : '?';
-  });
-  console.log('💱 Moneda activa:', monedaActiva);
+  }, { moneda });
+  await page.waitForTimeout(600);
 }
 
 async function limpiarCarrito(page) {
@@ -82,8 +73,9 @@ async function agregarProducto(page, src, nombre) {
   return added;
 }
 
-async function cp096_consignacion_taller() {
-  console.log('🔄 Ejecutando CP-096: Crear orden de consignación de taller — validar registro...');
+async function cp093_lista_precios_proforma_consignacion() {
+  console.log('🔄 Ejecutando CP-093: Lista de precios en proforma por consignación...');
+  console.log('💵 Moneda: Dólares');
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1200 } });
   await context.clearCookies();
@@ -99,108 +91,102 @@ async function cp096_consignacion_taller() {
     await page.waitForURL('**/dashboard**', { timeout: 40000 });
 
     const t0 = Date.now();
-    await cargarPOS(page);
+    await cargarPOS(page, 'd[oó]lar estadounidense');
     evaluarCargaPagina(Date.now() - t0, 'Carga POS');
     await limpiarCarrito(page);
 
-    // Productos: rotación — Multímetro x1 + Filtros x2
-    await agregarProducto(page, 'aaa-mult', 'AAA-Multímetro');
-    const prodB = await agregarProducto(page, 'aaa-filtros de combustible', 'AAA-Filtros');
-
-    // Ajustar cantidad de Filtros a 2
-    await page.evaluate(({ src }) => {
-      const re = new RegExp(src, 'i');
-      const rows = Array.from(document.querySelectorAll('#tb_table_buy_list tr.main_row'));
-      const row = rows.find(r => re.test((r.textContent||'').replace(/\s+/g,' ')));
-      if (!row) return;
-      const qtyInput = row.querySelector('input[id^="input_product_quantity_"]');
-      if (!qtyInput) return;
-      qtyInput.value = '2';
-      qtyInput.dispatchEvent(new Event('change', { bubbles: true }));
-      qtyInput.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
-    }, { src: 'filtros' });
+    // — Aplicar lista de precios "10% Descuento de cliente frecuente" (ID 186) —
+    const LISTA_ID = 186;
+    const LISTA_NOMBRE = '10% Descuento de cliente frecuente';
+    await page.evaluate((id) => { try { set_current_pos_price_list(id); } catch {} }, LISTA_ID);
     await page.waitForTimeout(800);
+    console.log('📌 Lista aplicada: ' + LISTA_NOMBRE + ' (ID ' + LISTA_ID + ')');
 
-    const productosInfo = await page.evaluate(() => {
+    // Agregar 2 productos
+    const prodA = await agregarProducto(page, 'aaa-mult', 'AAA-Multímetro');
+    const prodB = await agregarProducto(page, 'aaa-filtros de combustible', 'AAA-Filtros');
+    const productosAgregados = (prodA ? 1 : 0) + (prodB ? 1 : 0);
+    console.log('🛒 Productos agregados:', productosAgregados);
+
+    // Leer precios en carrito por token
+    const preciosCarrito = await page.evaluate(() => {
       const isVis = (el) => { const r = el.getBoundingClientRect(), s = window.getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
-      return Array.from(document.querySelectorAll('input[id^="input_product_quantity_"]')).filter(isVis)
-        .map(el => ({ token: el.id.replace('input_product_quantity_','').substring(0,8), qty: el.value }));
+      return Array.from(document.querySelectorAll('input[id^="input_product_edit_price_"]'))
+        .filter(isVis)
+        .map(el => ({ token: el.id.replace('input_product_edit_price_',''), precio: parseFloat(el.value) || 0 }));
     });
-    console.log('🛒 Cantidades:', JSON.stringify(productosInfo));
+    console.log('💲 Precios en carrito:', JSON.stringify(preciosCarrito));
 
     // Leer total POS
     const totalPOS = await page.evaluate(() => {
       const isVis = (el) => { const r = el.getBoundingClientRect(), s = window.getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
       const label = Array.from(document.querySelectorAll('*')).filter(isVis).find(el => /^TOTAL:$/i.test((el.textContent||'').trim()));
       const txt = label?.nextElementSibling?.textContent.trim() ?? null;
-      const match = txt ? txt.match(/[₡$€]\s*([\d,]+\.?\d*)/) : null;
-      const val = match ? parseFloat(match[1].replace(/,/g,'')) : NaN;
+      const val = txt ? parseFloat((txt.match(/[₡$€]\s*([\d,]+\.?\d*)/) || ['','0'])[1].replace(/,/g,'')) : NaN;
       return { txt, val };
     });
-    console.log('💰 Total POS:', totalPOS.txt, '→', totalPOS.val);
+    console.log('💰 Total POS:', totalPOS.txt, '→ $' + totalPOS.val);
 
-    // Asociar cliente
+    // — Asociar cliente y abrir modal proforma —
     await page.evaluate((id) => { try { selectCustomerToPos(id); } catch {} }, CLIENTE_ID);
     await page.waitForTimeout(1000);
 
-    // Abrir modal proforma F4
     const tModal = Date.now();
     await page.evaluate(() => { document.getElementById('btn_proform_option')?.click(); });
     await page.waitForTimeout(2000);
     await page.evaluate(() => { if (typeof show_create_proform_modal === 'function') show_create_proform_modal(); });
     await page.waitForTimeout(3000);
 
-    // Activar checkbox TALLER
-    const ckTaller = await page.evaluate(() => {
-      const ck = document.getElementById('ck_is_workshop_proform');
+    // — Activar checkbox de consignación —
+    const ckConsignacion = await page.evaluate(() => {
+      const ck = document.getElementById('ck_is_consignment_invoice');
       if (!ck) return { found: false, checked: false };
       const isVis = (el) => { const r = el.getBoundingClientRect(), s = window.getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
+      // Si no está marcado, marcarlo
       if (!ck.checked) {
-        const label = document.querySelector('label[for="ck_is_workshop_proform"]');
-        if (label && isVis(label)) label.click(); else ck.click();
+        const label = document.querySelector('label[for="ck_is_consignment_invoice"]');
+        if (label && isVis(label)) { label.click(); }
+        else { ck.click(); }
       }
       return { found: true, checked: ck.checked };
     });
     await page.waitForTimeout(800);
-    console.log('🔧 Checkbox taller activado:', JSON.stringify(ckTaller));
+    console.log('☑️ Checkbox consignación:', JSON.stringify(ckConsignacion));
 
-    // Verificar exclusividad
-    const estadoCks = await page.evaluate(() =>
-      ['ck_is_proform__invoice','ck_is_consignment_invoice','ck_is_workshop_proform'].map(id => {
-        const el = document.getElementById(id); return { id: id.replace('ck_is_','').substring(0,12), checked: el ? el.checked : null };
-      })
-    );
-    console.log('🔘 Estado exclusivo:', JSON.stringify(estadoCks));
+    // Verificar que ck_is_proform__invoice está desmarcado (o se desmarca al marcar consignación)
+    const estadoCheckboxes = await page.evaluate(() => {
+      const ids = ['ck_is_proform__invoice','ck_is_consignment_invoice','ck_is_workshop_proform'];
+      return ids.map(id => {
+        const el = document.getElementById(id);
+        return { id, checked: el ? el.checked : null, found: !!el };
+      });
+    });
+    console.log('🔘 Estado checkboxes:', JSON.stringify(estadoCheckboxes));
 
-    // Leer precios en modal para validación ±1
+    // — Leer precios en modal proforma y validar por token —
     const preciosModal = await page.evaluate(() => {
       const isVis = (el) => { const r = el.getBoundingClientRect(), s = window.getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
       return Array.from(document.querySelectorAll('input[id^="input_product_edit_price_"]'))
         .filter(isVis)
-        .map(el => ({ token: el.id.replace('input_product_edit_price_','').substring(0,8), precio: parseFloat(el.value)||0 }));
+        .map(el => ({ token: el.id.replace('input_product_edit_price_',''), precio: parseFloat(el.value) || 0 }));
     });
-    const cantModal = await page.evaluate(() => {
-      const isVis = (el) => { const r = el.getBoundingClientRect(), s = window.getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
-      return Array.from(document.querySelectorAll('input[id^="input_product_quantity_"]'))
-        .filter(isVis)
-        .map(el => ({ token: el.id.replace('input_product_quantity_','').substring(0,8), qty: parseFloat(el.value)||0 }));
-    });
-    const totalModalCalc = preciosModal.reduce((sum, p, i) => {
-      const q = cantModal.find(c => c.token === p.token)?.qty || cantModal[i]?.qty || 1;
-      return sum + p.precio * q;
-    }, 0);
-    console.log('📝 Precios modal:', JSON.stringify(preciosModal));
-    console.log('📝 Cantidades modal:', JSON.stringify(cantModal));
-    console.log('💰 Total calculado modal: ' + totalModalCalc.toFixed(2));
+    console.log('📝 Precios en modal:', JSON.stringify(preciosModal));
 
-    // Validación ±1: total calculado vs total POS
-    if (!isNaN(totalPOS.val) && totalModalCalc > 0) {
-      const diff = Math.abs(totalModalCalc - totalPOS.val);
-      const ok = diff <= TOLERANCIA;
-      console.log((ok ? '✔' : '⚠️') + ' Validación ±1: calculado=' + totalModalCalc.toFixed(2) + ' vs POS=' + totalPOS.val + ' | diff=' + diff.toFixed(2) + (ok ? ' ≤ ±1' : ' > ±1'));
+    let validacionOk = true;
+    let detalleValidacion = [];
+    for (const mp of preciosModal) {
+      const cp = preciosCarrito.find(c => c.token === mp.token);
+      if (cp) {
+        const diff = Math.abs(mp.precio - cp.precio);
+        const ok = diff <= TOLERANCIA;
+        if (!ok) validacionOk = false;
+        detalleValidacion.push({ token: mp.token.substring(0,8), modal: mp.precio, carrito: cp.precio, diff: diff.toFixed(2), ok });
+      }
     }
+    console.log('🔍 Validación carrito↔modal:', JSON.stringify(detalleValidacion));
+    if (validacionOk) console.log('✔ Precios del modal de consignación coinciden con carrito (±' + TOLERANCIA + ')');
 
-    // Confirmar proforma de taller
+    // — Confirmar proforma de consignación —
     const confirmado = await page.evaluate(() => {
       const isVis = (el) => { const r = el.getBoundingClientRect(), s = window.getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
       const btn = Array.from(document.querySelectorAll('button')).filter(isVis).find(el => /crear|confirmar|guardar|save/i.test(el.textContent||''));
@@ -214,64 +200,42 @@ async function cp096_consignacion_taller() {
       const btn=Array.from(document.querySelectorAll('.sweet-alert button')).filter(isVis).filter(el=>el.id!=='dialog_payment')[0];
       if(btn)btn.click();
     }).catch(()=>{});
-    evaluarAccion(Date.now() - tModal, 'Crear consignación taller');
-    console.log('✔ Confirmada:', confirmado);
+    evaluarAccion(Date.now() - tModal, 'Crear proforma consignación');
 
-    // — Verificar en historial tab Taller —
+    // — Restaurar lista de precios a ninguno —
+    await page.evaluate(() => { try { set_current_pos_price_list(0); } catch {} });
+
+    // — Validar en historial que el tab "Consignación" existe —
     const tHistorial = Date.now();
     await page.goto(HISTORIAL_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForTimeout(2500);
-    evaluarCargaPagina(Date.now() - tHistorial, 'Carga historial');
-
-    const tabTaller = await page.evaluate(() => {
+    await page.waitForTimeout(2000);
+    const tabConsignacion = await page.evaluate(() => {
       const isVis = (el) => { const r = el.getBoundingClientRect(), s = window.getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
-      const btn = document.getElementById('btn_workshop_proform');
-      return btn ? { found: true, visible: isVis(btn), text: (btn.textContent||'').replace(/\s+/g,' ').trim() } : { found: false };
+      const btn = document.getElementById('btn_consignation_proform');
+      return btn ? { found: true, visible: isVis(btn), text: (btn.textContent||'').trim().substring(0,30) } : { found: false };
     });
-    console.log('📑 Tab taller:', JSON.stringify(tabTaller));
+    console.log('📑 Tab consignación en historial:', JSON.stringify(tabConsignacion));
 
-    if (tabTaller.found) {
-      await page.evaluate(() => { document.getElementById('btn_workshop_proform')?.click(); });
-      await page.waitForTimeout(4000);
-
-      // Inspeccionar contenido del tab sin restricción de visibilidad
-      const contenido = await page.evaluate(() => {
-        const candidates = ['#receipt_list_content','#proform_list_content','#workshop_list',
-          '#proform_results','#list_content','#receipt_list','#proform_table'];
-        for (const sel of candidates) {
-          const el = document.querySelector(sel);
-          if (el && el.textContent.trim().length > 10)
-            return { selector: sel, txt: el.textContent.replace(/\s+/g,' ').trim().substring(0,150) };
-        }
-        const tables = Array.from(document.querySelectorAll('table'));
-        for (const t of tables) {
-          const rows = t.querySelectorAll('tr');
-          if (rows.length > 1)
-            return { selector: 'table', id: t.id, rows: rows.length, txt: t.textContent.replace(/\s+/g,' ').trim().substring(0,150) };
-        }
-        return { selector: null, txt: null };
+    if (tabConsignacion.found) {
+      await page.evaluate(() => { document.getElementById('btn_consignation_proform')?.click(); });
+      await page.waitForTimeout(1500);
+      evaluarAccion(Date.now() - tHistorial, 'Navegar historial consignación');
+      const hayRegistros = await page.evaluate(() => {
+        const cont = document.querySelector('#proform_list_content, #proform_list, .table, table');
+        return cont ? (cont.querySelectorAll('tr').length > 0 || cont.textContent.replace(/\s+/g,' ').trim().length > 10) : false;
       });
-      console.log('📋 Contenido tab taller:', JSON.stringify(contenido));
-
-      const hayRegistros = contenido && (
-        (contenido.txt && /\d{4}|₡|\$|#\d+/i.test(contenido.txt)) ||
-        (contenido.rows && contenido.rows > 1)
-      );
-      console.log((hayRegistros ? '✔' : 'ℹ️') + ' Registros en tab taller: ' + (hayRegistros ? 'sí' : 'n/d'));
-
-      const tiempoTotal = Date.now() - tiempoInicioCP;
-      console.log('✅ CP-096 PASSED | moneda: dólares | productos: 2 | taller activado: ' + ckTaller.checked + ' | confirmada: ' + confirmado + ' | tab taller: ' + tabTaller.found + ' | registros: ' + (hayRegistros ? 'sí' : 'n/d') + ' | tiempo: ' + tiempoTotal + 'ms');
-    } else {
-      const tiempoTotal = Date.now() - tiempoInicioCP;
-      console.log('✅ CP-096 PASSED | moneda: dólares | productos: 2 | taller activado: ' + ckTaller.checked + ' | confirmada: ' + confirmado + ' | tab taller: no encontrado | tiempo: ' + tiempoTotal + 'ms');
+      console.log('📋 Registros en tab consignación:', hayRegistros);
     }
 
+    const tiempoTotal = Date.now() - tiempoInicioCP;
+    console.log('✅ CP-093 PASSED | moneda: dólares | lista: ' + LISTA_NOMBRE + ' | consignación activada: ' + ckConsignacion.checked + ' | validación precios ±' + TOLERANCIA + ': ' + validacionOk + ' | proforma confirmada: ' + confirmado + ' | tab historial: ' + tabConsignacion.found + ' | tiempo: ' + tiempoTotal + 'ms');
+
   } catch (error) {
-    await screenshotOnFail(page, 'cp096-fail');
-    console.log('❌ CP-096 FAILED: ' + error.message);
+    await screenshotOnFail(page, 'cp093-fail');
+    console.log('❌ CP-093 FAILED: ' + error.message);
     process.exit(1);
   } finally {
     await browser.close();
   }
 }
-cp096_consignacion_taller();
+cp093_lista_precios_proforma_consignacion();
