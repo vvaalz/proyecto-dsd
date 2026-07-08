@@ -24,28 +24,41 @@ Suite de pruebas automatizadas desarrollada en JavaScript con Selenium WebDriver
 ## Cómo ejecutar las pruebas
 
 ### Ejecutar un caso de prueba individual
+La suite activa (Playwright) vive en `tests-playwright/`, organizada en subcarpetas por módulo → submódulo del sistema real (ver tabla de "Estructura de carpetas" más abajo). Para correr un caso, apuntar a su ruta completa:
 ```bash
-node tests/cp001-login-valido.js
-node tests/cp002-login-invalido.js
-node tests/cp003-campos-vacios.js
-node tests/cp004-usuario-inexistente.js
-node tests/cp005-carga-dashboard.js
-node tests/cp006-acceso-recepcion-vehiculo.js
-node tests/cp007-agregar-cliente-nuevo.js
-node tests/cp008-asignar-mecanico-servicio.js
-node tests/cp009-modal-confirmacion-guardar.js
-node tests/cp010-cancelar-generacion-orden.js
-node tests/cp017-carga-tablero-ordenes.js
-node tests/cp018-buscar-orden-tablero.js
-node tests/cp019-crear-seccion-tablero.js
-node tests/cp020-avanzar-orden-siguiente-etapa.js
-node tests/cp011-whatsapp-modal-orden.js
-node tests/cp012-buscar-orden-placa.js
-node tests/cp013-buscar-orden-nombre-cliente.js
-node tests/cp014-cambiar-vista-lista-caja.js
-node tests/cp015-cambiar-sucursal-selector.js
-node tests/cp016-chat-interno-orden.js
+node tests-playwright/00-acceso/01-login/cp001-login-valido.js
+node tests-playwright/00-acceso/01-login/cp002-login-invalido.js
+node tests-playwright/00-acceso/02-dashboard/cp005-carga-dashboard.js
+node tests-playwright/02-gestion-taller/01-recepcion-vehiculo/cp006-acceso-recepcion-vehiculo.js
+node tests-playwright/02-gestion-taller/02-taller-basico/cp017-carga-tablero-ordenes.js
+node tests-playwright/01-facturar/01-pos-basico/cp031-carga-modulo-pos.js
+node tests-playwright/03-rutas/01-admin-rutas/cp128-carga-modulo-rutas.js
+node tests-playwright/01-facturar/09-ruteo-pos/cp137-carga-tab-ruteo-pos.js
 ```
+(La suite histórica en Selenium vive en `tests/selenium-backup/` como respaldo — ya no se ejecuta ni se modifica.)
+
+### Estructura de carpetas de `tests-playwright/`
+
+Cada CP nuevo debe ubicarse en la subcarpeta de su módulo/submódulo real (ver sección "Convención de carpetas para CPs nuevos" en `CLAUDE_CONTEXT.md`), nunca suelto en la raíz.
+
+| Módulo | Submódulo | Rango de CPs | Ruta de carpeta |
+|--------|-----------|--------------|------------------|
+| 00-acceso | 01-login | CP-001 – CP-004 | `tests-playwright/00-acceso/01-login/` |
+| 00-acceso | 02-dashboard | CP-005 | `tests-playwright/00-acceso/02-dashboard/` |
+| 01-facturar | 01-pos-basico | CP-031 – CP-057 | `tests-playwright/01-facturar/01-pos-basico/` |
+| 01-facturar | 02-pos-avanzado | CP-058 – CP-073 | `tests-playwright/01-facturar/02-pos-avanzado/` |
+| 01-facturar | 03-factura-credito | CP-074 – CP-083 | `tests-playwright/01-facturar/03-factura-credito/` |
+| 01-facturar | 04-proforma-cotizaciones | CP-084 – CP-098 | `tests-playwright/01-facturar/04-proforma-cotizaciones/` |
+| 01-facturar | 05-apartados | CP-099 – CP-103 | `tests-playwright/01-facturar/05-apartados/` |
+| 01-facturar | 06-cierre-caja | CP-104 – CP-108 | `tests-playwright/01-facturar/06-cierre-caja/` |
+| 01-facturar | 07-ordenes-caja-taller | CP-109 – CP-125 | `tests-playwright/01-facturar/07-ordenes-caja-taller/` |
+| 01-facturar | 08-metodos-pago-generales | CP-126 – CP-127 | `tests-playwright/01-facturar/08-metodos-pago-generales/` |
+| 01-facturar | 09-ruteo-pos | CP-137 – CP-145 | `tests-playwright/01-facturar/09-ruteo-pos/` |
+| 02-gestion-taller | 01-recepcion-vehiculo | CP-006 – CP-016 | `tests-playwright/02-gestion-taller/01-recepcion-vehiculo/` |
+| 02-gestion-taller | 02-taller-basico | CP-017 – CP-030 | `tests-playwright/02-gestion-taller/02-taller-basico/` |
+| 03-rutas | 01-admin-rutas | CP-128 – CP-136 | `tests-playwright/03-rutas/01-admin-rutas/` |
+
+Nota: "01-facturar/09-ruteo-pos" (órdenes de ruteo creadas desde el POS) es un módulo distinto de "03-rutas/01-admin-rutas" (administración de rutas/zonas/clientes/repartidores) — ver la distinción completa en `CLAUDE_CONTEXT.md` secciones 14 y 15.
 
 ## Autenticación en las pruebas
 
@@ -53,9 +66,9 @@ node tests/cp016-chat-interno-orden.js
 - **CP-128 en adelante**: usan sesión reutilizable vía `storageState` (Playwright) en lugar de loguearse de cero en cada script. El sistema vive en `auth/`:
   - `auth/generar-sesion.js` — hace login una vez y guarda la sesión en `auth/sesion-qa.json` (ignorado por git, contiene tokens activos).
   - `auth/usar-sesion.js` — expone `abrirContextoConSesion(browser)`: reutiliza la sesión si tiene menos de 2 horas, o la regenera automáticamente si no existe o está vencida.
-  - Uso en un CP nuevo:
+  - Uso en un CP nuevo — desde que la suite quedó organizada en `tests-playwright/modulo/submodulo/`, cada CP está 2 niveles más profundo que la raíz de `tests-playwright/`, por lo que el require de `auth/usar-sesion` necesita **3** `../` (no 1):
     ```js
-    const { abrirContextoConSesion } = require('../auth/usar-sesion');
+    const { abrirContextoConSesion } = require('../../../auth/usar-sesion');
     const context = await abrirContextoConSesion(browser);
     const page = await context.newPage();
     await page.goto('https://dev.designsoftcr.com/qa_talleralpha/public/dash/dashboard',
@@ -65,7 +78,7 @@ node tests/cp016-chat-interno-orden.js
   - `auth/test-sesion.js` valida el flujo completo (generación automática + reutilización) y sirve de referencia.
   - `auth/usar-sesion.js` también expone `refrescarConCacheLimpia(page)`: limpia la caché de red del navegador vía CDP (`Network.clearBrowserCache` + `Network.setCacheDisabled`) y recarga la página, sin afectar cookies ni la sesión activa. Se usa en los CPs del módulo Ruteo (CP-128 en adelante) justo después de navegar al módulo y antes de la lógica de cada prueba, para evitar que HTML/JS cacheado de una corrida anterior interfiera con la siguiente:
     ```js
-    const { abrirContextoConSesion, refrescarConCacheLimpia } = require('../auth/usar-sesion');
+    const { abrirContextoConSesion, refrescarConCacheLimpia } = require('../../../auth/usar-sesion');
     const context = await abrirContextoConSesion(browser);
     const page = await context.newPage();
     await page.goto('https://dev.designsoftcr.com/qa_talleralpha/public/route/adminRoute',
@@ -73,6 +86,7 @@ node tests/cp016-chat-interno-orden.js
     await refrescarConCacheLimpia(page);
     // ... lógica del CP ...
     ```
+  - Mismo criterio aplica a las rutas de screenshots en fallo (`path.join(__dirname, '..', '..', '..', 'reports', 'screenshots')`, 3 niveles en vez de 1) — ver el patrón completo en cualquier CP existente dentro de `tests-playwright/`.
 
 ## Casos de prueba implementados
 
