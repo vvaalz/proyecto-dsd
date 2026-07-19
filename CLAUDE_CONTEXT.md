@@ -59,7 +59,8 @@ proyecto-dsd/
     │   ├── 07-ordenes-caja-taller/        (CP-109 – CP-125)
     │   ├── 08-metodos-pago-generales/     (CP-126 – CP-127)
     │   ├── 09-ruteo-pos/                  (CP-137 – CP-145)
-    │   └── 11-end-pintura/                (CP-171 – CP-172)
+    │   ├── 11-end-pintura/                (CP-171 – CP-172)
+    │   └── 12-productos-externos/         (CP-177 – CP-182)
     ├── 02-gestion-taller/
     │   ├── 01-recepcion-vehiculo/         (CP-006 – CP-016)
     │   └── 02-taller-basico/              (CP-017 – CP-030, incluye el CP-017 duplicado: dos archivos cp017-*.js)
@@ -845,3 +846,50 @@ Ubicados en `tests-playwright/01-facturar/11-end-pintura/`, carpeta nueva sugeri
 - **CP-172** — camino sin servicios disponibles: SUV → Parte frontal (catálogo viejo) → BUMPER DEL, verifica el mensaje "Sin servicios" y el toast "No hay servicios activos" sin timeout genérico.
 
 El camino del modal "Selecciona un precio" queda sin CP propio porque no se pudo reproducir organicamente en este ambiente QA (ver hallazgo del Paso 5 arriba) — decisión confirmada con el usuario en vez de forzarlo mutando datos de catálogo con "Nuevo precio".
+
+---
+
+## 21. Productos Externos (exploración y cobertura 2026-07-19, CP-177 en adelante)
+
+Explorado en vivo vía `abrirContextoConSesion` + navegación directa al POS. Módulo con 0% de cobertura confirmado antes de empezar (no había ningún CP ni referencia a "Producto externo"/"Productos Externos" en la suite, salvo una mención de paso en la sección 15 sobre el menú `#demo-menu-lower-left`).
+
+### Ubicación y acceso
+- Vive dentro del **mismo menú de 3 puntos inferior izquierdo del carrito del POS** (`#demo-menu-lower-left`, distinto del `#demo-menu-top-right` que tiene Cotización/Orden de ruteo/Apartado/Enviar a caja — ver sección 15). Ese menú tiene 6 ítems: **`switch_compress`** ("Expandir/Encoger"), **`add_sc_product`** ("Producto externo", `onclick="add_product_sc()"`), `print_invoice` ("Historial de Facturas"), `view_proform` ("Historial de Proformas"), `show_pos_permissions_modal` ("Permisos del POS"), `open_invoice_setting_modal_pos` ("Configuración de Facturas").
+- Click en "Producto externo" abre el modal `#dialog_add_sc_product_1`, título "AGREGAR PRODUCTO EXTERNO".
+
+### Modal "AGREGAR PRODUCTO EXTERNO" — campos reales
+- `#product_sc_company_select` — fijo a la compañía de la sesión activa (TALLER ALPHA PREMIUM, id 20); cambiarlo sería una acción cross-compañía fuera de alcance (mismo criterio que el hallazgo de `#company_store_online_select` en sección 19) — no se tocó en ningún CP.
+- `#product_sc_name_preview` (texto, placeholder "Nombre del producto") — **cosmético únicamente**: el nombre que termina mostrándose en la fila del carrito es el del "Grupo de productos" seleccionado, no este campo. No se encontró ningún efecto observable de este campo más allá de la vista previa dentro del propio modal.
+- `#product_sc_real_code` (texto, requerido) — "Código Real (inventario)".
+- `#product_sc_code` (select, "Grupo de productos") — **en este ambiente QA solo existe UNA opción real**: "PRUEBAS BRENES PRUEBAS BRENES" (value `4030`), además del placeholder. Botón `#btn_show_add_product_sc_code` (+) permite crear un grupo nuevo — **deliberadamente no ejercitado**, mutaría el catálogo compartido de grupos de productos.
+- `#product_sc_seller` (select, "Vendedor Responsable") — 4 opciones reales: Drinjol (249), Jorvendedor (335), USUARIO VENDEDOR (324), vendedor valentina (305). Las 4 se usaron, una por cada CP-177 a CP-180.
+- `#product_sc_provider` (select, "Proveedor") — catálogo de proveedores reales de la compañía. Alternativa mutuamente excluyente: `#product_sc_another_provider` (texto libre, "Otro Proveedor"). Botón-lápiz `btn_show_add_product_sc_code_edit` (`show_quick_add_form_cabys_code_pe(1)`) abre edición del código CABYS — **deliberadamente no ejercitado**, es una acción administrativa de catálogo (mismo criterio que "Nuevo precio" en End. Pintura, sección 20).
+- `#product_sc_cost` (número, "Costo") y `#product_sc_utility` (número, "Utilidad %") — alimentan un cálculo automático de Precio/Total vía `get_product_sc_price()` (atado al evento `change` del checkbox `#product_sc_tax_checkbox`).
+- `#product_sc_tax_checkbox` ("¿Aplica Impuesto?") + botón "+" (`ext_product_add_tax_list_select_input(0,0)`) que agrega una fila con dos `<select>`: tipo de impuesto (`ext_product_add_product_tax_list_N`, ej. "01 Impuesto al valor agregado") y tarifa (`ext_product_add_product_tax_rate_list_N`, ej. "08 - 13.00% - Tarifa General 13%"). **Impuesto es obligatorio para guardar** (el intento de guardar sin esto muestra el noty "¡Seleccione al menos un impuesto con su tarifa correspondiente!").
+- `#product_sc_quantity`, `#product_sc_price`, `#product_sc_total` (números, requeridos).
+- `#product_sc_warranty_checkbox` ("¿Aplica Garantía?") revela `#product_sc_warranty_days` ("Días de garantía").
+- `#product_sc_comment` (textarea, "Observaciones").
+- Botón "Guardar" (`#save_external_product`, delega a `add_product_external_validation()`) y "Cerrar" (descarta el borrador sin guardar y cierra el modal — confirmado en CP-180).
+- Toggle "Ayuda" (`toggleHelp()`) — control secundario, ejercitado por completitud en CP-177.
+
+### ⚠️ HALLAZGO 1 — Gate de aprobación de administrador con Utilidad &lt; 25% (confirmado en CP-178)
+Si `product_sc_utility` es menor a 25%, `add_product_external_validation()` no muestra el SweetAlert normal de confirmación sino un modal aparte, `#dialog_approve_product_external_utility`: *"Aprobación de utilidad — La utilidad aplicada a la compra no debe de ser menor a 25.0000%. Para continuar es necesaria la aprobación de un administrador."*, con un `<select>` "Seleccionar administrador" + campo "Contraseña" + botones "Aplicar"/"Cancelar". CP-178 confirma que el gate aparece con utilidad 10%, **no intenta bypasearlo** (requeriría credenciales reales de un usuario administrador, fuera de alcance de esta suite QA) y lo cancela, luego corrige la utilidad a 35% para continuar por el camino normal.
+
+### 🔴 HALLAZGO 2 (CRÍTICO, confirmado en vivo antes de escribir ningún CP) — El total del carrito queda corrupto al agregar un Producto Externo
+Con Costo + Utilidad% ≥25 + un impuesto/tarifa seleccionados, el modal calcula correctamente Precio/Total (ej. Costo ₡442.48 + Utilidad 30% + IVA 13% = ₡650.00 exactos, verificado leyendo `#product_sc_price`/`#product_sc_total` **antes** de guardar). Al confirmar con el botón real "Agregar" del SweetAlert *"¡Agregar producto externo! ¿Está seguro que desea continuar?"* (mismo botón que usaría un usuario real, no un click sintético), **el monto que efectivamente queda en el carrito no tiene relación con ese cálculo** — se observaron montos como `$46,924,500,443.40`, `$61,001,850,578.30` y `$63,348,075,598.83` en corridas independientes, junto con un renglón interno de "Utilidad: 45177.78%" también sin sentido.
+
+- **Reproducido de forma limpia dos veces** en una corrida de un solo paso (sin re-disparar eventos duplicados), y luego reproducido consistentemente en los 6 CPs de este bloque (CP-177 a CP-182) — no es un artefacto del script de exploración.
+- El grupo de productos usado ("PRUEBAS BRENES", id 4030) devolvió el **mismo monto exacto** (`$61,001,850,578.30`) en corridas separadas realizadas en momentos distintos (exploración inicial y luego CP-177), lo que sugiere que el registro de ese producto en el catálogo de QA quedó con datos de costo/precio corruptos de forma persistente en el servidor tras las pruebas de esta exploración, no que el cálculo varíe cada vez. **Posible efecto secundario de esta misma exploración sobre datos compartidos de QA** — recomendado que el equipo de desarrollo revise/resetee el producto "PRUEBAS BRENES" (grupo id 4030) en la base de datos de este ambiente.
+- **Decisión confirmada con el usuario (2026-07-19)**: dado que facturar (confirmar el pago) con este monto corrupto dejaría una factura o saldo por cobrar absurdo persistido en el ambiente compartido (y posiblemente un envío a Hacienda con ese monto en el caso de Factura/Tiquete Electrónico), **ninguno de los 6 CPs de este bloque confirma el pago final** (`make_payment`/"Enviar a caja"). Cada CP llega hasta abrir el modal de pago (o hasta activar el modo crédito, en el caso de CP-181), documenta el hallazgo explícitamente en su salida de consola, y luego cierra el modal y vacía el carrito (`#cancel_sale` + confirmar "Limpiar lista") para no dejar el POS en un estado sucio para la siguiente sesión/CP.
+- Esto no se investigó más a fondo (ej. probar si dejar Costo/Utilidad vacíos y solo llenar Precio/Total manualmente evita el problema) porque el usuario optó explícitamente por "documentar y no completar el pago" en vez de "investigar más". Queda como posible trabajo futuro si se decide continuar la investigación de causa raíz.
+
+### Estado de implementación — ✅ completo hasta el punto seguro (2026-07-19)
+Ubicados en `tests-playwright/01-facturar/12-productos-externos/`, carpeta nueva creada para este módulo (numeración `12-`, siguiente después de `11-end-pintura`):
+- **CP-177** — cliente existente (ID 12735) + producto rápido (fallback a catálogo si CABYS es inestable, mismo hallazgo que CP-051). Cubre proveedor vía `<select>`, toggle de Ayuda.
+- **CP-178** — producto rápido + descuento general (10%), sin cliente. Demuestra y cancela el gate de aprobación de utilidad (Hallazgo 1). Cubre "Otro Proveedor" (texto libre) e Impuesto Selectivo de Consumo.
+- **CP-179** — cliente existente + producto rápido + descuento general (12%) + exoneración (patrón CP-071). Cubre proveedor vía `<select>` (otro id), garantía (checkbox + días) y observaciones.
+- **CP-180** — vista expandida/encogida (`switch_compress`, revertida al terminar) + producto externo (demuestra el botón "Cerrar" descartando un borrador antes de completar el real) + cliente existente + producto normal de catálogo + producto rápido + descuento general (8%).
+- **CP-181** — cliente existente + producto rápido + activar modo crédito (`ck_is_payment_credit` + `switch_payment_type(2)`, patrón CP-074/CP-081): valida checkbox y fecha de vencimiento, sin confirmar el pago a crédito.
+- **CP-182** — cliente asociado solo por nombre (patrón CP-034) + producto rápido.
+
+Los 6 CPs pasan (exit code 0) documentando el Hallazgo 2 como resultado (⚠️), no como fallo — mismo criterio que CP-071/CP-118/CP-176 para hallazgos confirmados de la aplicación, no del script. Ningún CP confirma el pago final; todos dejan el carrito vacío al terminar.
