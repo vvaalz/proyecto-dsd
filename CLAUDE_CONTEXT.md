@@ -991,3 +991,22 @@ Por instrucción explícita del usuario (no se sabe cuánto tiempo dará el jura
 
 ### Estado de implementación
 Ubicado en `tests-playwright/05-demo-defensa/01-general/cp194-demo-defensa-proyecto-final.js` — carpeta nueva top-level (`05-demo-defensa/`) porque este CP cruza varios módulos existentes, siguiendo igualmente la convención de profundidad de 2 niveles bajo `tests-playwright/` (mismo patrón de 3 `../` para `auth/usar-sesion` y `config`). Validado en vivo de punta a punta en una sola sesión continua (Bloques 1→2 con `BLOQUES_A_EJECUTAR = [1, 2]`): crea cliente + vehículo BMW, genera la orden (ej. #810), y la localiza inmediatamente en el tablero con total limpio (₡0.00, sin productos/servicios). Tiempo total de la corrida combinada: ~2 minutos (con el ambiente en su estado lento de la sección 22).
+
+---
+
+## 24. Tab "Tienda en línea" dentro del POS (CP-196, 2026-07-25) — distinto del tab de Panel de Control
+
+**Contexto**: CP-055 (`01-facturar/01-pos-basico/`) solo verificaba que el tab `#btn_get_virtual_order_list` del POS cargara y mostrara los textos "Órdenes pendientes"/"Órdenes aprobadas" — sin interactuar con nada real. Este tab es **distinto** del tab "Tienda online" de Panel de Control (`/sett/setting`, configuración de la tienda — moneda, colores, newsletter — cerrado en CP-176, sección 19): el de POS es una **bandeja de seguimiento de pedidos ya colocados** en la tienda en línea del taller, no configuración.
+
+### Contenido real descubierto (no depende de montos/totales)
+- El tab muestra 3 contadores reales, cada uno con su propio `onclick="show_fast_traking(N)"`: **Pendientes** (N=1), **Aprobadas** (N=2), **En camino** (N=5). Cada uno abre el mismo panel lateral deslizante **"Seguimiento"** (`.esthela`, función `getPosStoreOnlineTrackingTable(N)`), pre-filtrado por esa categoría.
+- El panel "Seguimiento" tiene controles reales de gestión de pedidos:
+  - Texto de ayuda inline (3 pasos: seleccionar órdenes → validar estado → "Guardar Cambios"; nota de que se envía correo/notificación push al cliente).
+  - `#order_tracking_state` — dropdown (Chosen) "Cambiar estado". **Hallazgo confirmado**: las opciones **no son fijas** — son contextuales al estado de la categoría abierta (comportamiento de máquina de estados): con "Pendientes" abierto ofrece las 4 opciones (Aprobada/Rechazada/En camino/Entregado); con "Aprobadas" ofrece 3 (Rechazada/En camino/Entregado); con "En camino" ofrece solo 1 (Entregado, el único estado siguiente válido).
+  - `#fast_select_all_order_tracking` — checkbox "Seleccionar todos".
+  - `#btn_save_masive_tracking` (`onclick="save_tracking_order_state()"`) — acción **en lote**: guarda el nuevo estado para todas las órdenes seleccionadas y, según el propio texto de ayuda del panel, dispara correo electrónico y/o notificación push al cliente. **Deliberadamente no se invoca en el CP** — es una acción en lote que requiere confirmación explícita del usuario antes de ejecutarse (regla del proyecto desde el incidente de Ruteo, sección 15), y además tiene un efecto externo real (notificar clientes).
+  - `#close_sidebar` (icono fa-times) — cierra el panel.
+- **Gap de cobertura documentado (no resuelto)**: este ambiente QA no tiene ninguna orden real de tienda en línea (0 en las 3 categorías al momento de escribir esto) — no se pudo ejercer el flujo completo de principio a fin (aprobar/rechazar una orden real y confirmar que el "Guardar cambios" efectivamente cambia su estado). Ninguno de los controles ejercitados depende de calcular precios/totales, por lo que este bloque no se vio afectado por el hallazgo crítico de la sección 22.
+
+### Estado de implementación
+**CP-196** (`tests-playwright/01-facturar/01-pos-basico/`, misma carpeta que CP-055 al que reemplaza en profundidad de cobertura): abre el tab, lee los 3 contadores reales, abre el panel "Seguimiento" para las 3 categorías (confirmando que abre correctamente en cada una y documentando las opciones contextuales del dropdown en cada una), ejercita el dropdown "Cambiar estado" con las opciones reales de la última categoría abierta, ejercita el checkbox "Seleccionar todos", y cierra el panel — sin invocar nunca "Guardar cambios". Pasa documentando el hallazgo como resultado (⚠️), no como fallo, mismo criterio que otros CPs con gaps de datos de ambiente (ej. Honduras en sección 19).
