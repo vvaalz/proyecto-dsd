@@ -57,7 +57,7 @@ Cada CP nuevo debe ubicarse en la subcarpeta de su módulo/submódulo real (ver 
 | 00-acceso | 01-login | CP-001 – CP-004 | `tests-playwright/00-acceso/01-login/` |
 | 00-acceso | 02-dashboard | CP-005 | `tests-playwright/00-acceso/02-dashboard/` |
 | 01-facturar | 01-pos-basico | CP-031 – CP-057, CP-196 | `tests-playwright/01-facturar/01-pos-basico/` |
-| 01-facturar | 02-pos-avanzado | CP-058 – CP-073 | `tests-playwright/01-facturar/02-pos-avanzado/` |
+| 01-facturar | 02-pos-avanzado | CP-058 – CP-073, CP-200 | `tests-playwright/01-facturar/02-pos-avanzado/` |
 | 01-facturar | 03-factura-credito | CP-074 – CP-083 | `tests-playwright/01-facturar/03-factura-credito/` |
 | 01-facturar | 04-proforma-cotizaciones | CP-084 – CP-098 | `tests-playwright/01-facturar/04-proforma-cotizaciones/` |
 | 01-facturar | 05-apartados | CP-099 – CP-103 | `tests-playwright/01-facturar/05-apartados/` |
@@ -208,6 +208,7 @@ Esto lee `reports/tiempos-ejecucion.json` y genera `reports/reporte-tiempos.html
 | CP-071 | Aplicar exoneración (2 productos: gravado x2 + exento x1) y validar aceptación por Hacienda (monto exonerado = IVA exacto, confirmado; Factura Electrónica bloqueada; venta completada con Tiquete Electrónico; estado Hacienda no resuelto en ~75s) | ⚠️ |
 | CP-072 | Verificar planillas de factura en Configuración → Admin. factura (tabs Factura/Proforma/Ticket, 36 opciones de plantilla, guardado: todo responde correctamente) — hallazgo de performance: la página tarda 12-18s en cargar (umbral ❌ es 8000ms), "Guardar" también lento (~7s) | ⚠️ |
 | CP-073 | Factura a crédito: 3 productos (AAA-Multímetro x1 gravado, AAA-Bombillos x1 exento, AA-Maletero x1 fracción) en colones — script verificado via inspección (defecto CP-038 corregido, crédito funciona, diálogo fraccionado usa prod_frag_q). Pendiente re-correr: el entorno QA estaba inestable (renderer crashes, carga POS >20s) al momento de generar este CP. | ⚠️ |
+| CP-200 | Gap "combo multi-tipo de producto en un carrito" (producto normal + rápido + fraccionado + servicio en una sola venta, nunca antes probado junto). Agrega los productos de forma INCREMENTAL comparando, tras cada uno, el total real del carrito contra la suma de precios reales extraídos del propio `onclick="add_to_table(...)"` de cada tarjeta. **Hallazgo confirmado (reconfirmación del hallazgo crítico de la sección 22, 2026-07-26)**: al agregar el primer producto (AAA-Bombillos, precio real ₡1,000) el carrito mostró ₡206,515,713.60 — el CP se detuvo de inmediato (por instrucción explícita), sin agregar el resto de tipos ni intentar otras combinaciones ni completar el pago. Hallazgo nuevo: TODAS las tarjetas del catálogo (incluso productos no tocados) pasan a mostrar el mismo monto corrupto, sugiriendo una variable de estado global corrupta, no un error de cálculo aislado por producto. Ver `CLAUDE_CONTEXT.md` sección 22 | ⚠️ |
 | CP-074 | Factura a crédito con 3 productos normales + 1 fraccionado (AA-Maletero) en colones — cliente 12735, switch_payment_type(2), validación saldo pendiente en /credit_sale/clientCreditSales | ✅ |
 | CP-075 | Factura a crédito con producto rápido (CABYS fallback a catálogo) en dólares — IVA gravado + exento, conversión de moneda | ✅ |
 | CP-076 | Factura a crédito + abono inicial: 3 productos colones, ingresa abono, valida saldo restante = total − abono (tolerancia ±1) | ✅ |
