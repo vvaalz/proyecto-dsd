@@ -66,8 +66,10 @@ proyecto-dsd/
     │   └── 02-taller-basico/              (CP-017 – CP-030, incluye el CP-017 duplicado: dos archivos cp017-*.js)
     ├── 03-rutas/
     │   └── 01-admin-rutas/                (CP-128 – CP-136)
-    └── 04-panel-control/
-        └── 01-general/                    (CP-146 – CP-176)
+    ├── 04-panel-control/
+    │   └── 01-general/                    (CP-146 – CP-176)
+    └── 06-inventario/
+        └── 01-crear-producto/             (CP-201 – CP-202)
 ```
 
 Notas:
@@ -1047,3 +1049,36 @@ Botón **"Guardar y Salir"** (`save_customer()`) — al confirmar: (1) aparece u
 
 ### Estado de implementación — ✅ completo (2026-07-26)
 5 CPs (CP-193 cliente sencillo, CP-195 cliente completo con los 3 tabs, CP-199 varias actividades económicas, CP-197 vehículo completo, CP-198 vehículo mínimo), todos 5/5 validaciones, todos verificando persistencia real reabriendo el cliente creado (no solo el panel de la venta). Numeración con huecos (194, 196) por colisión con CPs creados por sesiones concurrentes en el mismo rango numérico (demo de defensa y tab Tienda en línea, respectivamente) — resuelto renumerando en caliente antes de confirmar cada archivo.
+
+---
+
+## 26. Crear producto en el catálogo (CP-201–CP-202, 2026-07-26) — módulo "Inventario", gap cubierto
+
+Cubre el gap de AUDITORIA-FLUJOS-2026-07-15.md: no existía ningún CP que creara un producto nuevo en el catálogo (distinto de "Producto Rápido" del POS, CP-051, y de "Productos Externos", CP-177–182 — ambos son atajos de facturación puntual, no gestión real del catálogo).
+
+### Cómo se llega
+Menú lateral → **"Inventario"** → **"Crear y editar producto"** → `/prod/product`. Botón **"Agregar producto"** (`#add_product`, a veces bloqueado por el banner de permisos de notificaciones del navegador — hacer `document.getElementById('workshop-web-notification-permission-dismiss')?.click()` antes si existe) abre un **wizard de página completa** (NO un modal) con 6 pasos marcados por círculos de navegación: **Inf. General → Costos → Desc. Producto → Imágenes → Filtro servicios → Filtro Autos**. Los círculos son solo indicadores visuales — clickearlos directamente NO cambia de paso, hay que usar los botones reales del formulario.
+
+### Botones "Guardar"/"Siguiente" — trampa de selector
+En los pasos 1–5, cada paso tiene **dos** `<input name="next">` con distinto `value`: uno dice "Guardar" (dispara `POST /prod/saveProductStepOne` de inmediato con lo llenado hasta ese punto) y otro "Siguiente" (solo avanza de paso). Ambos comparten el mismo atributo `name`, así que `querySelectorAll('input[name="next"]')[0]` es no determinístico — hay que filtrar por `value` exacto. En el paso 6 ("Filtro Autos") el patrón cambia: el botón que efectivamente guarda el producto es un **`<button>` de texto "Guardar"** (no un `input[name="next"]`), junto a "Añadir Nuevo" (para el sub-formulario de vehículo relacionado, no tocar) y "Anterior". El guardado real del producto queda confirmado por la respuesta de red `{"status":1,"product_id":<N>,"message":"Los datos del producto se guardaron correctamente."}` — no hace falta clickear "Finalizar" para que el producto quede persistido.
+
+### Paso 1 "Inf. General"
+`#product_name` (único campo requerido de este paso) · `#product_code` / `#product_bar_code` / `#product_brand` / `#product_tariff_item_code` / `#product_color_code` / `#product_color_name` / `#product_provider_code` / `#product_reference_code` (name real `product_reference_codee`, con doble "e" — typo del sistema) / `#product_quality` / `#product_name_english` (todos opcionales) · `#category_select_spk` (select real, `name="product_category"`, categorías reales de este ambiente QA con bastante ruido de datos de prueba — ej. value="148" text="ACEITES") · `#subcategory_select_spk` / `#sub_category_level_3_select_spk` / `#sub_category_level_4_select_spk` (selects dependientes, opcionales, casi siempre vacíos salvo la categoría elegida) · `#provider_select_spk` (opcional) · `#p_year_manufactured` (opcional).
+
+**Código CABYS es un gate obligatorio para avanzar**, aunque ningún campo lo marque visualmente como requerido: sin configurarlo, clickear "Siguiente" abre un modal informativo bloqueante "Configuración CABYS" (botones "Cancelar"/"Ver video") en vez de avanzar de paso. Se configura con un botón editar junto al texto "Código CABYS" (ubicarlo subiendo hasta 4 niveles de `.closest('div')`/`.parentElement` desde el nodo de texto, buscando un `button`/`a.btn`), que abre el modal "Búsqueda de código CABYS" (`#cabys_code_search` + tabla ya poblada por defecto, se puede filtrar escribiendo un término + Enter). **Trampa de selector**: los botones "APLICAR" de cada fila son `<a class="btn btn-success btn-5">APLICAR</a>`, NO `<button>` — un `querySelectorAll('button')` los pasa por alto y da un falso negativo silencioso (mismo tipo de trampa ya visto con `.i_edit_customer` en la sección 25). Buscar con `querySelectorAll('a, button')` filtrado por texto exacto `'APLICAR'` (mayúsculas). Coincide con el hallazgo de CP-051 (CABYS inestable para "Producto Rápido") en que ambos flujos dependen del mismo buscador — pero aquí, a diferencia de CP-051, la búsqueda respondió consistentemente con resultados reales en las pruebas.
+
+### Paso 2 "Costos"
+`#product_cost` (requerido) · `#product_price` (requerido, precio de venta) · toggle "¿Aplica Impuesto?" (activo por defecto) revela `#product_tax_list_1` (tipo de impuesto, ej. "01 Impuesto al valor agregado") + `#product_tax_rate_list_1` (tarifa, ej. "08 - 13.00% - Tarifa General 13%") · `#product_discount` (descuento proveedor %) · `#product_utility` (utilidad %) · `#product_commission` · `#product_quantity` · `#product_unit_type` (select de **unidad de medida** — Caja/Bolsa/Docena/Frasco/etc., NO es el "tipo de producto") · `#product_max_discount` · `#product_stock_min` / `#product_stock_max` · `#product_section` / `#product_sub_section` (ubicación en bodega, opcionales).
+
+**El "tipo de producto" fraccionado se controla con el checkbox `#is_fragment`** (atado al toggle visual "¿Fraccionar?"). Al activarlo, el formulario reemplaza `product_discount`/`product_utility`/`product_price`/`product_quantity` por sus equivalentes de caja y fracción: `#product_quantity_box` (cajas), `#fragments_per_unit` (fracciones por caja), `#product_utility_box`/`#product_discount_box`/`#product_price_box` (precio por caja) y `#product_utility_fragment`/`#product_discount_fragment`/`#product_price_fragment`/`#product_current_fragment_quantity` (precio por fracción) — mismo concepto ya documentado para "AA-Maletero" en la memoria de selectores del POS (sección de hallazgos de producto fraccionado), pero aquí es donde se **crea** ese tipo de producto, no donde se factura.
+
+No se encontró un tipo "servicio" dentro de este mismo wizard de `/prod/product` — el acceso rápido "Servicios" visto en el dashboard (`MÓDULO Servicios ADMINISTRAR`) es un módulo separado de gestión de taller, fuera del alcance de "crear producto en el catálogo" que pedía cubrir este gap. Por eso CP-202 cubre **fraccionado** como el "tipo distinto" disponible dentro de este mismo flujo.
+
+### Pasos 3–6
+**Desc. Producto**: `#product_size`, `#product_description` (textarea), `#product_dimensions` (textarea) — todos opcionales; también expone `#alternate_product_company_id` (select con TODAS las compañías del ecosistema SaaS) pero es para vincular un "producto alterno" de otra compañía, no para elegir la compañía del producto que se está creando (esa queda fija en **TALLER ALPHA PREMIUM**, mostrada como "Compañía seleccionada" en el header del wizard — mismo hallazgo de compañía única ya confirmado para esta cuenta QA en otras partes del proyecto). **Imágenes**: solo un input file opcional. **Filtro servicios**: sin campos para la categoría "ACEITES" usada en las pruebas (vacío, no es un error). **Filtro Autos**: campos de marca/modelo/transmisión/motor/año para relacionar el producto a un vehículo, todos opcionales — y el botón final "Guardar" descrito arriba.
+
+### Verificación de persistencia sin usar el carrito
+Por instrucción explícita del usuario, estos CPs **no agregan el producto creado a ningún carrito ni calculan ningún total** (para no ejercer el bug de montos corrupto de la sección 22). La verificación usa dos señales independientes: (1) la respuesta de red de `POST /prod/saveProductStepOne` (`status:1` + `product_id` numérico) y (2) que el nombre del producto (generado con timestamp para ser único) aparece en `document.body.innerText` tras buscarlo con el input de búsqueda del listado (`placeholder` que contiene "uscar") y `#btn_product_search`.
+
+### Estado de implementación — ✅ completo (2026-07-26)
+2 CPs, ambos 2/2 validaciones: **CP-201** (producto normal, todos los campos de Inf. General/Costos/Desc. Producto llenos) y **CP-202** (producto fraccionado, campos mínimos: nombre + CABYS + categoría + costo + los 4 campos de caja/fracción). Carpeta nueva `tests-playwright/06-inventario/01-crear-producto/` — módulo "Inventario" no tenía carpeta ni CPs previos. Productos de prueba creados en el ambiente QA compartido con prefijo `CP-201-`/`CP-202-` + timestamp para no colisionar con datos de otras sesiones/CPs.
