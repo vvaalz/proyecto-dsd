@@ -12,9 +12,10 @@ Prioridades del proyecto, en orden:
 6. **Creación de clientes** — en curso (CP-193, CP-195, CP-197–CP-199).
 7. **Importar Factura** — en curso.
 8. **Taller — vista de orden** — en curso.
-9. **Creación de producto** — en curso (CP-201–CP-202, ver `CLAUDE_CONTEXT.md` sección 26).
+9. **Creación de producto** — cerrado (CP-201–CP-202, ver `CLAUDE_CONTEXT.md` sección 26).
 10. **Proforma: retomar y facturar** — pausado por el bug de montos (sección 22 de `CLAUDE_CONTEXT.md`).
 11. **Retroactualización de CP-001 a CP-127** (migrar al patrón moderno de sesión reutilizable/`config.js`) — al final del proyecto.
 12. **Módulo "Ventas"** (Histórico de Ventas, Abono Cuentas por Cobrar, Lista de Cobros, Historial Mov. de Caja, Devoluciones, Nota de crédito) — 🔴 **bloqueado** (2026-08-01): explorado en vivo, confirmado que el bug de montos de la sección 22 ya afecta registros PERSISTIDOS (facturas, devoluciones y notas de crédito reales, incluyendo el panel resumen agregado de Notas de Crédito con ₡57 mil millones acumulados) — no solo el carrito en vivo como se pensaba hasta CP-200. Ningún CP escrito, pendiente de decisión del usuario sobre cómo proceder. Ver `CLAUDE_CONTEXT.md` sección 27.
+13. **Módulo "Citas"** — cerrado dentro del alcance autorizado (CP-204–CP-207, 2026-08-01/02): ciclo completo de crear/ver/editar/cancelar una cita, ver `CLAUDE_CONTEXT.md` sección 28. **Deliberadamente sin cubrir** (cruce con el bug de montos de la sección 22, pendiente de decisión del usuario): agregar servicios/productos a una cita (calcula Total Servicios/Productos/General igual que el carrito del POS) y el botón "Convertir a orden" (crea una orden de taller real desde la cita).
 
-Ver `AUDITORIA-FLUJOS-2026-07-15.md` para el detalle de los gaps que originaron los puntos 6–10.
+Ver `AUDITORIA-FLUJOS-2026-07-15.md` para el detalle de los gaps que originaron los puntos 6–10 y 13.

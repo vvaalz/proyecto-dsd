@@ -68,8 +68,10 @@ proyecto-dsd/
     │   └── 01-admin-rutas/                (CP-128 – CP-136)
     ├── 04-panel-control/
     │   └── 01-general/                    (CP-146 – CP-176)
-    └── 06-inventario/
-        └── 01-crear-producto/             (CP-201 – CP-202)
+    ├── 06-inventario/
+    │   └── 01-crear-producto/             (CP-201 – CP-202)
+    └── 07-citas/
+        └── 01-crear-editar-citas/         (CP-204 – CP-207)
 ```
 
 Notas:
@@ -1123,3 +1125,41 @@ Por instrucción explícita del usuario: al confirmarse que el módulo está afe
 
 ### Estado de implementación — 🔴 BLOQUEADO (2026-08-01), pendiente de decisión del usuario
 Exploración completa (los 6 sub-módulos), hallazgo documentado y escalado (de "posible bug de cálculo en vivo" a "confirmado en registros persistidos, incluyendo dashboards agregados"). Ningún CP escrito. Ver `PLAN-PROYECTO-FINAL.md` punto 12.
+
+**Nota de numeración para la próxima sesión que retome esto**: el top-level `tests-playwright/07-citas/` quedó ocupado (sección 28, mismo día) antes de que este bloque se resolviera — si "Ventas" se retoma, la carpeta nueva debe numerarse `08-ventas/`, no `07-ventas/`.
+
+---
+
+## 28. Módulo "Citas" (CP-204–CP-207, 2026-08-01/02) — gap cubierto, con un límite deliberado sin cruzar
+
+Gap de auditoría: módulo lateral **"Citas"** (`/reservation/reservation`) sin ninguna cobertura previa (ni carpeta ni CPs). Explorado en vivo por completo antes de escribir código, como pedía la tarea.
+
+### Qué es el módulo
+Ítem de acordeón de primer nivel del menú lateral (junto a "Gestión de Taller", "Compras", "Inventario"), no un submenú de otro módulo. Es un calendario (librería **FullCalendar**, clases `fc-*`) con vistas **Mes / Semana / Día / Agenda** (`Agenda` = vista de lista, `fc-listWeek-button`) y un panel lateral **"Recordatorios"** (próximas citas con badge "PRÓXIMA"). Barra superior con selector de compañía (mismo widget que en POS — **TALLER ALPHA PREMIUM**, sin ambigüedad de multi-compañía para esta cuenta, igual que en el resto del proyecto), buscador (`#search_reservation`), botón **"Crear cita"** (`#btn_add_cita_new`) y **"Enviar enlace"** (comparte un enlace de citas en línea por WhatsApp). 8 tarjetas de estadística: Total, Pendientes, En línea, Confirmadas, **Procesadas ("Ya con orden creada")**, Reagendadas, Anuladas, Pasadas.
+
+### Formulario "Agendar Cita" — NO es un `.modal` de Bootstrap
+Es un panel/overlay de página completa (`.appointment-modal-container` / `.appointment-modal-content`) — buscarlo por esa clase, no por `.modal` genérico (no matchea). Reutilizado tal cual para crear y para editar (ver abajo). Campos del bloque principal: `#title_reservation` (Asunto, texto libre, opcional), `#start_date_reservation`/`#start_schedule_reservation`/`#end_date_reservation`/`#end_schedule_reservation` (date/time nativos, se auto-llenan con "ahora +1h" al abrir), y el buscador de cliente `#clientSearchInput`. 4 acordeones en "Opciones Avanzadas": **Recurrencia** ("Asignar a" [mecánico/empleado, widget custom sin `<select>` nativo detectable — no se automatizó, ver hallazgo abajo], "Recurrencia", "Estado"), **Información del Vehículo** (Placa/Número de Unidad/Año son inputs de texto reales — `vehicle_reservation_plaque`, `vehicle_reservation_unit_number`, `vehicleYear` —, Marca/Modelo/Combustible/Transmisión son selects tipo Chosen sin id estable capturado), **Servicios y Productos** (ver hallazgo crítico abajo) y **Observaciones**.
+
+### 🔴 Punto de cruce con el hallazgo de montos (sección 22) — NO se ejerció, por instrucción explícita del usuario
+La sección "Servicios y Productos" del formulario tiene buscadores reales (`#search_services_reservation`, `#search_product_reservation`) y muestra **"Total Servicios:", "Total Productos:" y "Total General:"** — es decir, agregar un producto/servicio a una cita SÍ dispara el mismo cálculo de montos que el carrito del POS, potencialmente expuesto al mismo bug. Además, el modal de detalle de cada cita tiene un botón **"Convertir a orden"** que crea una orden de taller real a partir de la cita. **Ninguno de los 2 (agregar productos/servicios a una cita, ni "Convertir a orden") se ejerció** — se detectó el cruce, se detuvo la exploración de esa rama específica y se preguntó al usuario cómo proceder, según instrucción explícita del pedido original. El resto del ciclo de una cita (crear/ver/editar/cancelar) es genuinamente independiente del cálculo de montos — confirmado en CP-205, que verifica que "Total General" se mantiene en ₡0.00 mientras no se toque esa sección.
+
+### Buscador de cliente — NO es autocompletado, y el texto visible del calendario puede confundir
+- `#clientSearchInput` requiere llenar el input **y clickear el botón "Buscar" del propio formulario** (escopado a `.appointment-modal-container` — hay OTRO botón "Buscar" idéntico en el header global de la app). Sin ese clic, no se dispara ninguna búsqueda.
+- La búsqueda real es `POST /reservation/searchClientsSchedule`; los resultados son `div.client-search-result-item` (clickeables, con `cursor:pointer` y `onclick` real) — dentro de `.appointment-modal-container`, no en todo el documento.
+- **Trampa descubierta en vivo**: buscar por un nombre que en realidad es el ASUNTO de otra cita existente (ej. "Alan", visto en una celda del calendario) devuelve **"No se encontraron clientes."** — el texto visible en las celdas del calendario/Recordatorios NO es necesariamente un nombre de cliente real. Usar el cliente de prueba ya establecido en el proyecto, **"cliente prueba tarea 5"** (id 12735), que sí devuelve un resultado limpio.
+- **El calendario (Mes/Semana/Día/Agenda) muestra el NOMBRE DEL CLIENTE en cada celda, NUNCA el "Asunto de la Cita"** (`title_reservation`) — verificar la creación/edición de una cita buscando el texto del asunto en el calendario da falso negativo siempre. El asunto solo es visible en la barra de título del modal de detalle (`view_reservation`).
+
+### Endpoints reales confirmados por red (usar estos para validar, no solo la UI)
+- Guardar (crear o editar, mismo endpoint): `POST /reservation/save_reservation` → respuesta es el **id nuevo en texto plano** (ej. `"4351"`), NO un objeto JSON.
+- Justo después de guardar, la propia app dispara automáticamente `POST /reservation/view_reservation` con el detalle completo (incluyendo `title`, `client_id`, `client_name`) — es la señal más confiable para confirmar que el título/cliente quedaron correctos, mucho más robusta que buscar texto en el calendario.
+- Eliminar/Cancelar: `POST /reservation/delete_reservation` → responde `"1"` en texto plano. **Es un soft-delete**: la cita sigue apareciendo en `POST /reservation/get_reservations_by_month` (que devuelve TODAS las citas del rango, activas e inactivas), solo que con el campo `is_active` pasando de `1` a `0` — no desaparece de la lista. Validar por ese campo, no por ausencia.
+- Cada entrada de `get_reservations_by_month` trae `id`, `title`, `real_title`, `client{id,name,email,whatsapp}`, `vehicle{...}`, `start_date`/`end_date`, `status_id`, `is_active`, `is_confirmated`, `is_reschedule`, `repair_order_id` (0 si no se ha convertido a orden) — útil para futuras verificaciones sin depender de la UI.
+
+### Ver detalle y acciones reales (vista "Agenda")
+La vista "Agenda" (lista) es la única forma confiable de reabrir una cita — hacer clic directo sobre un evento del calendario en vista Mes/Semana **no abre nada** (solo re-dispara `get_reservations_by_month`; probable limitación del overlay de FullCalendar en este build). En Agenda, cada fila es `.fc-list-item`; al hacer clic abre el modal de detalle con: fecha/hora, datos del cliente, bloques "Servicios"/"Productos" (con sus totales) y acciones **Eliminar, WhatsApp, Email, Editar, Convertir a orden**. "Editar" reabre el mismo formulario de "Agendar Cita" pre-poblado (mismos ids de campo). "Eliminar" abre un SweetAlert *"¡Eliminar cita! ¿Esta seguro que desea continuar?"* (con el ruido cosmético habitual "! Not valid!" mezclado, mismo patrón que otros SweetAlerts del proyecto) con botones "Cancel"/"Aceptar" — confirmar por texto exacto "Aceptar".
+
+### Estrategia de aislamiento entre CPs (ambiente QA compartido)
+Como el calendario no muestra el asunto, localizar una cita propia recién creada en la vista Agenda requiere un ancla distinta: los CPs de este bloque fijan explícitamente `start_schedule_reservation` a un horario HH:MM único (derivado de `Date.now()` en el momento de la corrida) y luego buscan la fila de Agenda cuyo texto incluya ese horario exacto — evita colisionar con citas de otras sesiones/CPs corriendo en paralelo sobre el mismo cliente de prueba compartido.
+
+### Estado de implementación — ✅ completo dentro del alcance autorizado (2026-08-02)
+4 CPs (`tests-playwright/07-citas/01-crear-editar-citas/`), todos 2/2 validaciones: **CP-204** crea una cita básica y confirma por red; **CP-205** ve el detalle de una cita vía Agenda y confirma acciones reales + Total General ₡0.00; **CP-206** edita una cita existente confirmando que persiste sobre el mismo id; **CP-207** cancela una cita confirmando el soft-delete (`is_active=0`). **Deliberadamente sin cubrir**: agregar servicios/productos a una cita y "Convertir a orden" (cruce con la sección 22, pendiente de decisión del usuario) — tampoco se automatizó "Asignar a" (mecánico) por ser un widget custom sin selector estable identificado en la exploración disponible.
