@@ -23,6 +23,10 @@ async function abrirContextoConSesion(browser) {
     storageState: SESION_PATH,
     viewport: { width: 1440, height: 1200 }
   });
+  // Se aplica al contexto (no a cada page) para que llegue tambien a ventanas nuevas que se
+  // abren despues de la carga inicial, como el dialogo de impresion nativo que dispara
+  // printRepairOrderPayments al guardar un abono (ver CLAUDE_CONTEXT.md).
+  await context.addInitScript(() => { window.print = () => {}; });
   return context;
 }
 

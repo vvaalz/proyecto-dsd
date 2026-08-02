@@ -1163,3 +1163,28 @@ Como el calendario no muestra el asunto, localizar una cita propia recién cread
 
 ### Estado de implementación — ✅ completo dentro del alcance autorizado (2026-08-02)
 4 CPs (`tests-playwright/07-citas/01-crear-editar-citas/`), todos 2/2 validaciones: **CP-204** crea una cita básica y confirma por red; **CP-205** ve el detalle de una cita vía Agenda y confirma acciones reales + Total General ₡0.00; **CP-206** edita una cita existente confirmando que persiste sobre el mismo id; **CP-207** cancela una cita confirmando el soft-delete (`is_active=0`). **Deliberadamente sin cubrir**: agregar servicios/productos a una cita y "Convertir a orden" (cruce con la sección 22, pendiente de decisión del usuario) — tampoco se automatizó "Asignar a" (mecánico) por ser un widget custom sin selector estable identificado en la exploración disponible.
+
+---
+
+## 29. 🛠️ Infraestructura compartida — fix del colgado por diálogo de impresión nativo (`auth/usar-sesion.js`, 2026-08-02)
+
+Mientras se cubría el gap de "Gestión de Taller" (ver bloque en curso, CP-203 en adelante), guardar un abono (`save_repair_order_payment()`) colgaba el script indefinidamente (se midió una espera de +330s antes de fallar con `Execution context was destroyed, most likely because of a navigation`, y en otra corrida con `Target page, context or browser has been closed`).
+
+### Causa raíz confirmada en vivo
+Guardar un abono dispara 3 llamadas de red en cadena: `POST /vehicularReception/addPaymentToRepairOrder` → `POST /vehicularReception/getOrderSearch` → **`POST /vehicularReception/printRepairOrderPayments`**. Esta última abre un **diálogo de impresión nativo del sistema operativo** (una ventana/pestaña nueva tipo `about:blank`, "Impresión de factura"), no un modal HTML. El truco ya usado en varios CPs de `page.evaluate(() => window.print = () => {})` **solo neutraliza `window.print` en la página ya cargada al momento de ejecutarlo** — no alcanza a ventanas/pestañas que Chromium abre después, así que el diálogo nativo queda esperando interacción humana para siempre y el script (y el proceso `chrome.exe` de Playwright) se cuelga.
+
+Se confirmó reproduciendo el flujo aislado paso a paso: sin seleccionar "Aplicar a caja" (`rop_apply_to_cash_id`), `save_repair_order_payment()` no hace nada observable (validación silenciosa, sin toastr ni SweetAlert — hallazgo aparte, ver nota abajo). Con caja seleccionada, el guardado sí dispara la cadena de 3 requests y el colgado ocurre justo después de `printRepairOrderPayments`.
+
+### Fix aplicado — a nivel de contexto, no de página
+En `auth/usar-sesion.js`, dentro de `abrirContextoConSesion`, justo después de crear el `context`:
+
+```js
+await context.addInitScript(() => { window.print = () => {}; });
+```
+
+**Por qué a nivel de `context` y no de `page`**: `addInitScript` en el contexto se re-ejecuta automáticamente en *cualquier* página o ventana nueva abierta dentro de ese mismo contexto durante toda la sesión — incluyendo la ventana de impresión que se abre después de la carga inicial. Un `page.evaluate(() => window.print = () => {})` aplicado a la página principal nunca llega a esa ventana nueva. Este fix reemplaza (no necesita coexistir con) cualquier neutralización de `window.print` hecha por separado en CPs individuales.
+
+Verificado en vivo: reintentando el mismo flujo de abono (monto + método de pago + caja + guardar) con el fix aplicado, `page.click()` en el botón "Guardar" completa sin timeout, el modal cierra normalmente (`display:none`) y no hay ningún colgado ni error de contexto destruido.
+
+### Hallazgo aparte (no bloqueante, documentado para no repetir el diagnóstico)
+Si se guarda un abono sin seleccionar "Aplicar a caja", `save_repair_order_payment()` no produce ningún efecto observable (ni request de red, ni error de consola, ni toastr, ni SweetAlert) — es una validación silenciosa del lado del cliente. Los CPs de abono deben seleccionar siempre una caja antes de guardar.
