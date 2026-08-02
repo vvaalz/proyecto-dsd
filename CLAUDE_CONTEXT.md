@@ -1082,3 +1082,44 @@ Por instrucción explícita del usuario, estos CPs **no agregan el producto crea
 
 ### Estado de implementación — ✅ completo (2026-07-26)
 2 CPs, ambos 2/2 validaciones: **CP-201** (producto normal, todos los campos de Inf. General/Costos/Desc. Producto llenos) y **CP-202** (producto fraccionado, campos mínimos: nombre + CABYS + categoría + costo + los 4 campos de caja/fracción). Carpeta nueva `tests-playwright/06-inventario/01-crear-producto/` — módulo "Inventario" no tenía carpeta ni CPs previos. Productos de prueba creados en el ambiente QA compartido con prefijo `CP-201-`/`CP-202-` + timestamp para no colisionar con datos de otras sesiones/CPs.
+
+---
+
+## 27. 🔴 Módulo "Ventas" — explorado, BLOQUEADO por el hallazgo crítico de montos corruptos (escalado: ahora afecta registros PERSISTIDOS, no solo el carrito en vivo) (2026-08-01)
+
+Gap de auditoría: no existía ninguna cobertura del módulo lateral **"Ventas"** (distinto de "Facturar" / POS, ya cubierto extensamente). Se exploró en vivo antes de escribir ningún CP, tal como pedía la tarea.
+
+### Qué es realmente el módulo "Ventas"
+Ítem de acordeón del menú lateral (`<a>Ventas</a>`, `href="javascript:void(0);"` — **ojo**: existe un segundo `<a>` con el mismo texto "Ventas" que es un link de contacto de WhatsApp de soporte, `href="https://api.whatsapp.com/send?phone=..."`, completamente ajeno al módulo; no confundirlos por texto solo). Al expandirlo, revela 6 sub-ítems — confirmado que es, como se sospechaba, un módulo de **reportes/gestión de ventas ya realizadas**, no de facturación:
+
+| Sub-ítem | URL |
+|---|---|
+| Histórico de Ventas | `/receip/printPosReceip` |
+| Abono Cuentas por Cobrar | `/credit_sale/clientCreditSales` (ya usada como verificación secundaria en CP-074/077) |
+| Lista de Cobros | `/receip/receivableList` |
+| Historial Mov. de Caja | `/cash_movement/movements` |
+| Devoluciones | `/refund/refund` |
+| Nota de crédito | `/creditNote/creditNote` |
+
+### 🔴 Hallazgo — el bug de la sección 22 no solo sigue activo, sino que ahora se confirma en registros PERSISTIDOS reales, no solo en el total del carrito de una sesión en vivo
+Hasta ahora (sección 22, CP-200) el hallazgo se había verificado únicamente **antes de confirmar el pago** — es decir, existía la posibilidad (no confirmada) de que el problema fuera solo de cálculo/display en el carrito y que las facturas ya emitidas históricamente estuvieran bien. **Este supuesto queda descartado**: al explorar "Histórico de Ventas" con el filtro por defecto (rango 17/07/2026–01/08/2026, sin tocar nada), se encontraron facturas REALES ya emitidas y persistidas con montos absurdos, mezcladas con facturas normales del mismo período:
+
+- **No. ADM2165 a ADM2172** (8 facturas consecutivas, "Contado", "Cliente de contado", fechadas **31/07/2026**): las 8 muestran exactamente **₡206.515.713,09** — el mismo valor exacto que ya se había visto en CP-200 (sección 22) como total corrupto de un carrito con un solo producto de ₡1.000.
+- **No. ADM2173 y ADM2174** (mismo día): **₡9.293.205.046,84** cada una.
+- **No. ADM2159 / ADM2157** (30/07/2026, cliente "MARIA ALEXANDRA BRENES RODRIGUEZ"): **₡4.898.261.538,30** y **₡5.724.324.390,26** respectivamente — confirma que el monto corrupto no es siempre el mismo número, varía.
+- En contraste, **No. ADM2164, ADM2162, ADM2161** (mismo rango de fechas) muestran montos perfectamente razonables (₡49.998,87 / ₡190.568,94 / ₡1.000,00) — el bug no afecta el 100% de las facturas, es intermitente (posiblemente ligado al producto/flujo usado en cada venta, no investigado a fondo — fuera de alcance).
+- **"Devoluciones"** muestra el mismo patrón: 6 registros visibles, montos de ₡31.782.768,49 (repetido 4 veces) a ₡95.348.305,46 — todos con la etiqueta "FE" (Factura Electrónica), fechados 24/07/2026.
+- **"Nota de crédito"** es el hallazgo más grave: además de filas individuales corruptas (ej. "Anulación ₡206,515,712.00", que coincide casi exactamente con el mismo total corrupto de Histórico de Ventas, y "Anulación ₡233,362,752.00"), el **panel de resumen agregado de la propia pantalla** muestra **"MONTO TOTAL: ₡57,279,274,3XX.XX"** (57 mil millones de colones acumulados en solo 24 notas de crédito) y **"ANULACIONES: 11 — ₡38,274,352,416.00"** (38 mil millones) — es decir, el bug ya contaminó también los totales agregados/dashboard de este módulo, no solo las filas individuales.
+- "Lista de Cobros" mostró valores con precisión decimal anómala (ej. `88495.4425`, `30560354.31563`) — irregular, aunque no necesariamente de la misma magnitud (miles de millones) que los demás; no se investigó más a fondo.
+- "Historial Mov. de Caja" no mostró ninguna fila con montos en la exploración rápida (0 filas — podría ser un dato genuino de "sin movimientos" o un problema de selector distinto; no confirmado de una forma u otra).
+
+**Implicación de negocio, no solo de QA**: dado que varias de las facturas corruptas están marcadas como "FE" (Factura Electrónica) y tienen número de consecutivo de Hacienda (ej. `00400001040000000943`), existe la posibilidad de que se hayan transmitido documentos electrónicos con montos absurdos a Hacienda — esto excede el alcance de una suite de pruebas y se documenta aquí explícitamente para que el equipo de desarrollo/negocio lo evalúe con urgencia.
+
+### Evidencia (capturas, no versionadas — `reports/screenshots/`, carpeta ignorada por git)
+`exploracion-ventas-00-dashboard-2026-08-01.png` (dashboard, menú cerrado) · `exploracion-ventas-01-menu-expandido-2026-08-01.png` (acordeón "Ventas" expandido con los 6 sub-ítems visibles) · `exploracion-ventas-02-historico-HALLAZGO-2026-08-01.png` (listado de Histórico de Ventas con las facturas corruptas junto a las normales) · `exploracion-ventas-03-abono-cxc-2026-08-01.png` · `exploracion-ventas-04-lista-cobros-2026-08-01.png` · `exploracion-ventas-05-historial-mov-caja-2026-08-01.png` · `exploracion-ventas-06-devoluciones-HALLAZGO-2026-08-01.png` · `exploracion-ventas-07-nota-credito-HALLAZGO-2026-08-01.png` (panel resumen con los ₡57 mil millones).
+
+### Decisión — bloqueado, sin CPs de cobertura "feliz"
+Por instrucción explícita del usuario: al confirmarse que el módulo está afectado por el hallazgo crítico, **no se escribió ningún CP** para "Ventas" (ni de filtros, ni de listado, ni de detalle de factura) — se documenta el hallazgo (esta sección) y se pregunta al usuario cómo proceder, mismo criterio que con el bloque de combos (`CP-200`, sección 22) y el bloque de "retomar proforma" (pausado desde el 19/07/2026). **No se creó ninguna carpeta `tests-playwright/07-ventas/`** — se pospone hasta que se resuelva cómo proceder.
+
+### Estado de implementación — 🔴 BLOQUEADO (2026-08-01), pendiente de decisión del usuario
+Exploración completa (los 6 sub-módulos), hallazgo documentado y escalado (de "posible bug de cálculo en vivo" a "confirmado en registros persistidos, incluyendo dashboards agregados"). Ningún CP escrito. Ver `PLAN-PROYECTO-FINAL.md` punto 12.

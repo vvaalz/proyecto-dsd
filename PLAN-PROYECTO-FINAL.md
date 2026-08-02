@@ -15,5 +15,6 @@ Prioridades del proyecto, en orden:
 9. **Creación de producto** — en curso (CP-201–CP-202, ver `CLAUDE_CONTEXT.md` sección 26).
 10. **Proforma: retomar y facturar** — pausado por el bug de montos (sección 22 de `CLAUDE_CONTEXT.md`).
 11. **Retroactualización de CP-001 a CP-127** (migrar al patrón moderno de sesión reutilizable/`config.js`) — al final del proyecto.
+12. **Módulo "Ventas"** (Histórico de Ventas, Abono Cuentas por Cobrar, Lista de Cobros, Historial Mov. de Caja, Devoluciones, Nota de crédito) — 🔴 **bloqueado** (2026-08-01): explorado en vivo, confirmado que el bug de montos de la sección 22 ya afecta registros PERSISTIDOS (facturas, devoluciones y notas de crédito reales, incluyendo el panel resumen agregado de Notas de Crédito con ₡57 mil millones acumulados) — no solo el carrito en vivo como se pensaba hasta CP-200. Ningún CP escrito, pendiente de decisión del usuario sobre cómo proceder. Ver `CLAUDE_CONTEXT.md` sección 27.
 
 Ver `AUDITORIA-FLUJOS-2026-07-15.md` para el detalle de los gaps que originaron los puntos 6–10.
