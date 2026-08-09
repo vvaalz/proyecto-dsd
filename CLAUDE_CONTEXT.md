@@ -1191,7 +1191,7 @@ Los botones "WhatsApp" y "Email" del modal de detalle (`confirm_send_whatsapp(th
 
 ## 29. 🛠️ Infraestructura compartida — fix del colgado por diálogo de impresión nativo (`auth/usar-sesion.js`, 2026-08-02)
 
-Mientras se cubría el gap de "Gestión de Taller" (ver bloque en curso, CP-203 en adelante), guardar un abono (`save_repair_order_payment()`) colgaba el script indefinidamente (se midió una espera de +330s antes de fallar con `Execution context was destroyed, most likely because of a navigation`, y en otra corrida con `Target page, context or browser has been closed`).
+Mientras se cubría el gap de "Gestión de Taller" (ver sección 30, CP-249 en adelante), guardar un abono (`save_repair_order_payment()`) colgaba el script indefinidamente (se midió una espera de +330s antes de fallar con `Execution context was destroyed, most likely because of a navigation`, y en otra corrida con `Target page, context or browser has been closed`).
 
 ### Causa raíz confirmada en vivo
 Guardar un abono dispara 3 llamadas de red en cadena: `POST /vehicularReception/addPaymentToRepairOrder` → `POST /vehicularReception/getOrderSearch` → **`POST /vehicularReception/printRepairOrderPayments`**. Esta última abre un **diálogo de impresión nativo del sistema operativo** (una ventana/pestaña nueva tipo `about:blank`, "Impresión de factura"), no un modal HTML. El truco ya usado en varios CPs de `page.evaluate(() => window.print = () => {})` **solo neutraliza `window.print` en la página ya cargada al momento de ejecutarlo** — no alcanza a ventanas/pestañas que Chromium abre después, así que el diálogo nativo queda esperando interacción humana para siempre y el script (y el proceso `chrome.exe` de Playwright) se cuelga.
@@ -1211,3 +1211,58 @@ Verificado en vivo: reintentando el mismo flujo de abono (monto + método de pag
 
 ### Hallazgo aparte (no bloqueante, documentado para no repetir el diagnóstico)
 Si se guarda un abono sin seleccionar "Aplicar a caja", `save_repair_order_payment()` no produce ningún efecto observable (ni request de red, ni error de consola, ni toastr, ni SweetAlert) — es una validación silenciosa del lado del cliente. Los CPs de abono deben seleccionar siempre una caja antes de guardar.
+
+---
+
+## 30. Gestión de Taller — vista de detalle de una orden existente (CP-249–CP-255, 2026-08-02/08)
+
+Gap de auditoría: la vista de detalle de una orden ya existente en el tablero de Taller (menú "adv-order-dd" de cada tarjeta) no tenía cobertura de interacción real más allá de lo ya cubierto en CPs previos (agregar servicios/productos). Se cubrieron 7 flujos, todos sobre la misma orden de prueba limpia y compartida ("Cliente Demo Defensa", id interno 12305, Total de factura confirmado ₡0,00 — no relacionado al hallazgo crítico de montos de la sección 22). Se exploró en vivo el catálogo completo del menú antes de escribir código; el catálogo confirmado (onclick/href reales de cada entrada) queda documentado abajo para no tener que re-explorar en el futuro.
+
+### Catálogo completo del menú "adv-order-dd" de una orden (confirmado en vivo, orden 12305)
+| Texto del link | Mecanismo |
+|---|---|
+| Paso 1: Editar orden | `getOrderById(id)` |
+| Paso 2: Ver orden | `getOrderDetailById(id)` — **sin efecto visible** (ver hallazgo abajo) |
+| Paso 3 a 15 (asignar responsable, diagnóstico, presupuesto, repuestos, reparación, control de calidad) | Flujo del ciclo de vida completo de la orden, cada uno con su propio modal — fuera de alcance de este bloque |
+| Paso 17: Ir a facturar | `redirect_to_pos_blank(...)` — cruza al POS, fuera de alcance (riesgo de montos corruptos) |
+| Enviar por correo | `openSendOrderEmailModal(id, 'N/A')` → modal `dialog_send_order_email` |
+| Compartir por whatsapp | `confirmSendRepairOrderWhatsapp(...)` → modal `dialog_send_whatsapp_message` |
+| Descargar QR de vehículo | href directo `.../vehicularReception/getOrderQrById?id=...&plaque=...` (descarga real) |
+| Ver orden online | href directo `.../repair_order/get_repair_order_by_hash_key?hash_key=...`, `target="_blank"` |
+| Ver bitácora | `openRepairOrderStageLogbook(id)` |
+| Desactivar/Eliminar orden | acciones destructivas — no ejercidas |
+| Crear PDF General / Descriptivo | hrefs directos `.../vehicularReception/downloadPdfCreatedOrder?order_id=...&impression_type=0/1` (descarga real) |
+| Imprimir | `printVehicularReception(id)` → dispara `window.print()` (ver sección 29 para el fix del colgado) |
+| Crear PDF Proforma / Reporte Inspección / Reporte Inspección Avanzado | `generateProformOrderPDF`/`generateVehicleInspectionPDF`/`generateVehicleInspectionAdvancedPDF`, guardados con `typeof === 'function'` |
+| Imprimir abonos | `print_repair_order_payments(id)` |
+| Abonos | `show_add_repair_order_payment(id)` → modal `dialog_add_repair_order_payment` |
+
+### CP-249 — "Ver orden" (Paso 2) y Abonos con distintos métodos de pago
+**"Ver orden" no abre ningún modal, pero SÍ tiene un efecto real y duradero**: agrega la clase `viewing-repair-order` al `<body>`, que colapsa el buscador de órdenes (`#repair_order_search`) a 0×0 — **Escape no revierte este cambio de vista**, hace falta una recarga completa de página. Antes de este hallazgo se documentó incorrectamente como "sin efecto observable" (solo se había revisado si abría un `.modal`) — corregido aquí.
+
+**"Saldo actual" del formulario de abono no es el Total de la factura** (que sigue en ₡0,00, limpio) — es un saldo a favor independiente que solo baja con cada abono guardado y nunca se regenera solo entre corridas. Hallazgos confirmados en vivo:
+- El sistema **no valida sobregiro**: se puede guardar un abono aunque el saldo ya esté en ₡0,00 o incluso negativo (el saldo simplemente sigue bajando).
+- Guardar sin seleccionar "Aplicar a caja" no hace nada observable (ver sección 29).
+- El cierre del modal sin error tras "Guardar" es la señal de éxito real de cara al usuario — reabrir el mismo modal en la misma sesión para leer "Saldo actual" no sirve como evidencia de persistencia porque ese valor queda cacheado; solo una recarga completa de página lo refresca. Aun con recarga, en una corrida el saldo no bajó lo esperado tras 3 abonos aceptados (modal cerró sin error los 3) — hallazgo documentado para el equipo de desarrollo, no bloqueante para el CP porque la interacción real del formulario (llenar, seleccionar método/caja, guardar, cierre sin error) sí quedó demostrada para los 3 métodos (Efectivo, Tarjeta, SiNMPE).
+- **Riesgo evitado deliberadamente**: no se buscó en el resto de la lista de órdenes compartida cuando el saldo de la orden demo estaba negativo — cualquier otra orden podría estar afectada por el hallazgo crítico de montos (sección 22), y el pedido explícito del usuario es detenerse antes de calcular/mostrar el total de una factura desconocida.
+
+### CP-250 — Ver orden online
+Link público (`get_repair_order_by_hash_key`) que abre en pestaña nueva (`target="_blank"`) una vista de solo lectura para el cliente final, con menú propio (Dashboard, Órdenes, Agendar citas, Contáctenos, Califícanos), datos reales del cliente/vehículo y estadísticas. Confirmado que carga correctamente y muestra datos identificables de la orden.
+
+### CP-251 — Compartir por WhatsApp
+Modal con número de WhatsApp del cliente precargado, campo de mensaje libre, y 6 documentos disponibles como botones de descarga individuales (toggle "documentos a compartir" primero). Clickear un botón de documento abre una **pestaña nueva** con la URL pública `repair_order/share_document?hash_key=...&type=proforma` (no siempre es una descarga con evento `download`, puede ser navegación a pestaña nueva — el CP acepta ambas señales). El botón real "Enviar" existe pero deliberadamente no se clickea (no se envía ningún WhatsApp real, mismo precedente que CP-194/CP-205).
+
+### CP-252 — Enviar por Email
+Modal simple con campo de destinatarios tipo **selectize.js** (`#order_email_tags-selectized`) — **`.fill()` no funciona** porque asigna el value directamente sin disparar el parser interno que crea el tag/chip; hace falta tipeo real tecla por tecla (`page.keyboard.type` + `Enter`) y clickear el contenedor `.selectize-input` (no el input real, que se angosta a pocos px). El botón "Enviar" real existe (confirmado sin clickearlo).
+
+### CP-253 — Documentos (PDF General, PDF Descriptivo, PDF Reporte Inspección, Imprimir)
+Los 2 PDFs (General/Descriptivo) y el Reporte de Inspección se descargan como archivos reales (evento `download` de Playwright) al clickear sus links — no hace falta manejar pestañas nuevas para estos 3. "Imprimir" dispara `printVehicularReception()` → `window.print()`, neutralizado a nivel de contexto (sección 29) — validado que no cuelga y la página sigue respondiendo.
+
+### CP-254 — Descargar QR del vehículo
+Descarga real confirmada (`page.on('download')`), nombre de archivo coherente con la placa del vehículo (`<PLACA>.png_`), contenido no vacío.
+
+### CP-255 — Selección múltiple + "Facturar seleccionadas" (confirmación de ausencia)
+Reconfirmado en vivo (mismo hallazgo que en exploraciones previas): **no existe** ningún mecanismo de checkboxes por tarjeta + botón "Facturar seleccionadas" en ninguna de las ubicaciones plausibles revisadas (lista de órdenes/Torre de Control, tab interno "Tablero", `/vehicularReception/workOrderBoard`). El flujo solicitado (abrir el modal de pago con datos correctos vía selección múltiple, sin confirmar el pago) no se pudo ejercer porque el punto de entrada no existe en este ambiente — documentado como hallazgo confirmado, no como CP fallido.
+
+### Estado de implementación — ✅ completo dentro del alcance autorizado (2026-08-08)
+7 CPs (`tests-playwright/02-gestion-taller/02-taller-basico/`, carpeta ya existente), todos validados individualmente: **CP-249** a **CP-255**. Deliberadamente sin cubrir: envío real de WhatsApp/Email (precedente establecido), Paso 17 "Ir a facturar" y cualquier cálculo/visualización de un total de factura (riesgo del hallazgo crítico de montos, sección 22), y cualquier orden de la lista compartida distinta a la orden demo conocida y limpia.
