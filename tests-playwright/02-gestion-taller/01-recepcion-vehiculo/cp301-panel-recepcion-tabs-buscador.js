@@ -6,7 +6,9 @@ const { BASE_URL } = require('../../../config');
 const { registrarResultado, moduloDesdeRuta } = require('../../../utils/registrar-tiempo');
 
 const URL_RECEPCION = `${BASE_URL}/vehicularReception/vehicularQuickReception`;
-const TABS = ['Dashboard', 'Tablero', 'Repuestos', 'Cotizaciones', 'Gráficos', 'Tabla informativa'];
+// Nota: "Dashboard" y "Citas" NO existen como tabs en la versión actual de este panel
+// (confirmado en vivo, 2026-08-19) — solo estos 5 tabs además de "Órdenes" (por defecto).
+const TABS = ['Tablero', 'Repuestos', 'Cotizaciones', 'Gráficos', 'Tabla informativa'];
 
 const screenshotOnFail = async (page, name) => {
   try { const dir = path.join(__dirname,'..','..','..','reports','screenshots'); fs.mkdirSync(dir,{recursive:true}); await page.screenshot({path:path.join(dir,name+'-'+Date.now()+'.png'),timeout:5000}); } catch {}
@@ -106,7 +108,7 @@ async function cp301_panel_recepcion_tabs_buscador() {
     // ── VALIDACIONES ──
     const todosTabsOk = Object.values(resultadosTabs).every(Boolean);
     console.log('\n📊 === VALIDACIONES CP-301 ===');
-    console.log('  Todos los tabs (' + TABS.join(', ') + ') cargan contenido real:  ' + (todosTabsOk ? '✅' : '❌'));
+    console.log('  Todos los tabs (' + TABS.join(', ') + ') cargan contenido real: ' + (todosTabsOk ? '✅' : '❌'));
     console.log('  Buscador funciona en tab "Tablero":                              ' + (buscadorTableroOk ? '✅' : '❌'));
     console.log('  Buscador funciona en tab "Órdenes":                              ' + (buscadorOrdenesOk ? '✅' : '❌'));
 
@@ -114,7 +116,7 @@ async function cp301_panel_recepcion_tabs_buscador() {
     if (!buscadorTableroOk) throw new Error('El buscador en el tab "Tablero" no produjo resultados');
     if (!buscadorOrdenesOk) throw new Error('El buscador en el tab "Órdenes" no produjo resultados');
 
-    console.log('✅ CP-301 PASSED | 6 tabs cargan datos reales + buscador funciona en Tablero y Órdenes | validaciones: 3/3');
+    console.log('✅ CP-301 PASSED | 5 tabs cargan datos reales + buscador funciona en Tablero y Órdenes | validaciones: 3/3');
     registrarResultado({ cp: 'CP-301', modulo: moduloDesdeRuta(__dirname), estado: 'pass', tiempoMs: Date.now() - tiempoInicioCP });
 
   } catch (error) {
